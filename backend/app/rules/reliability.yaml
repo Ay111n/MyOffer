@@ -1,0 +1,64 @@
+sources:
+  user_provided: 1.00      # 人工录入的统一来源（v0.2 产品减法）：用户当前认可的信息，不做证据折扣；
+                           # 接入外部数据源后再启用细粒度来源可靠度
+  self_experience: 1.00
+  offer_letter: 0.98       # Offer / 劳动合同明确条款（原 offer_letter 与 contract 合并；库中无 contract 存量）
+  hiring_manager: 0.90
+  official_document: 0.90
+  interviewer: 0.88        # 面试官 / 招聘负责人：对岗位职责/团队情况是一手信息，但未必是带教者
+  teammate: 0.88
+  hr: 0.75
+  company_employee: 0.70
+  alumni: 0.65
+  online_consensus: 0.55
+  anonymous_online: 0.40
+  assumption: 0.25
+
+# 字段级来源适配系数（稀疏）：最终可靠度 = sources[source] × applicability[category][source]
+# 未列出的 (evidence_category, source) 组合适配度为 1.0（基础分原样生效）。
+# 档位约定（不追求假精确）：1.0 常规证明力 / 0.75 略削弱 / 0.5 明显削弱 / 0.25 基本不适用。
+# 取值范围 (0, 1] 与 category/source 引用完整性由 validate.py 启动校验。
+field_applicability:
+  contractual_fact:
+    self_experience: 0.6      # 实习期合同条款与校招合同可能不同
+    interviewer: 0.75         # 面试官口头描述的合同/主体条款需打折
+    teammate: 0.75
+    company_employee: 0.5
+    alumni: 0.5
+    online_consensus: 0.5
+    anonymous_online: 0.25
+  compensation_fact:
+    interviewer: 0.75
+    teammate: 0.75            # 他人的薪酬数字参考性有限
+    company_employee: 0.75
+    alumni: 0.5
+    online_consensus: 0.5
+    anonymous_online: 0.25
+  work_experience:
+    offer_letter: 0.75        # 纸面条款与实际体验常有出入
+    official_document: 0.75
+    hr: 0.75
+    alumni: 0.75
+    online_consensus: 0.5
+    anonymous_online: 0.5
+  team_status:
+    interviewer: 0.75         # 招聘方对团队状态的描述通常偏乐观
+    official_document: 0.5    # 官方材料很少反映团队真实状态
+    online_consensus: 0.75
+  business_strategy:
+    teammate: 0.75
+    interviewer: 0.75
+    hr: 0.75
+    online_consensus: 0.75
+  market_perception:
+    hiring_manager: 0.75
+    interviewer: 0.75
+    hr: 0.5
+    official_document: 0.5
+    offer_letter: 0.5
+    anonymous_online: 0.25
+
+  personal_context:
+    teammate: 0.5             # 他人的开销水平因生活方式而异
+    alumni: 0.5
+    online_consensus: 0.5

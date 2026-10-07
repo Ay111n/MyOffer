@@ -1,0 +1,45 @@
+default_weights:
+  economic: 0.34
+  growth: 0.33
+  experience: 0.33
+
+questionnaire_v2:
+  version: "v2"
+  title: "你的选择标准"
+  subtitle: "三道取舍题，确定报告权重。"
+  estimated_minutes: 1
+  dimensions:
+    economic: {label: 经济回报, description: 钱包能鼓多少：税后收入与城市购买力}
+    growth: {label: 职业成长, description: 履历能有多硬：业务与新人承担层级}
+    experience: {label: 工作体验, description: 班味有多浓：工时与每周占用}
+  questions:
+    - question_id: economic_vs_growth
+      kind: pairwise
+      prompt: 钱包更鼓，还是履历更硬？
+      left_dimension: economic
+      right_dimension: growth
+      options: &pair_options
+        - {value: left_strong, label: 明显偏左}
+        - {value: left_slight, label: 稍微偏左}
+        - {value: equal, label: 一样重要}
+        - {value: right_slight, label: 稍微偏右}
+        - {value: right_strong, label: 明显偏右}
+    - question_id: economic_vs_experience
+      kind: pairwise
+      prompt: 多搞点钱，还是少点班味？
+      left_dimension: economic
+      right_dimension: experience
+      options: *pair_options
+    - question_id: growth_vs_experience
+      kind: pairwise
+      prompt: 简历开挂，还是下班有命？
+      left_dimension: growth
+      right_dimension: experience
+      options: *pair_options
+    - question_id: buy_house_intent
+      kind: single
+      prompt: 未来 3–5 年，在工作城市买房这事儿上日程吗？
+      options:
+        - {value: consider, label: 考虑}
+        - {value: not_consider, label: 不考虑}
+        - {value: undecided, label: 还没决定}

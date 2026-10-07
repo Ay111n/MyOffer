@@ -1,0 +1,33 @@
+# MyOffer 生产后端依赖锁（pip freeze，2026-10-03 生成于生产 venv，Python 3.12.13）
+#
+# 用途：server-bootstrap.sh 以本文件安装依赖——版本必须显式提交变更，
+# 杜绝 `>=` 下限导致的不可复现构建与供应链漂移（审查 F4-9）。
+#
+# 升级流程：
+#   1. 在测试环境（或本地 venv）评估新版本并全量 pytest；
+#   2. 更新本文件并提交（注明升级原因）；
+#   3. 生产重跑 server-bootstrap.sh（幂等，venv 已存在时仅按锁对齐版本）。
+# 注意：本文件由 freeze 生成，含全部传递依赖；不要手工增删单行，
+#       重新生成方式：pip freeze | grep -v 'offer-decision-backend'
+annotated-doc==0.0.5
+annotated-types==0.8.0
+anyio==4.15.1
+click==8.5.0
+fastapi==0.142.2
+h11==0.16.0
+httptools==0.8.0
+idna==3.20
+opentelemetry-api==1.45.0
+pydantic==2.13.5
+pydantic-settings==2.15.0
+pydantic_core==2.46.5
+python-dotenv==1.2.4
+PyYAML==6.0.3
+SQLAlchemy==2.1.1
+starlette==1.7.0
+typing-inspection==0.4.4
+typing_extensions==4.16.0
+uvicorn==0.54.0
+uvloop==0.23.0
+watchfiles==1.3.0
+websockets==17.1

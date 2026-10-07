@@ -1,0 +1,37 @@
+[project]
+name = "offer-decision-backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "pydantic>=2.9",
+  "pydantic-settings>=2.5",
+  "sqlalchemy>=2.0",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.8"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# 项目 lint 契约：显式声明，不依赖任何用户级全局配置。
+# B008：FastAPI 的 Depends(...) 参数默认值是框架惯例；B017：包络测试用 pytest.raises(Exception)。
+select = ["E4", "E7", "E9", "F", "I", "B"]
+ignore = [
+  "B008",  # FastAPI 的 Depends(...) 参数默认值是框架惯例
+  "B017",  # 包络测试用 pytest.raises(Exception)
+  "B904",  # 统一错误包络在 except 内 raise HTTPException，无需 from 链
+  "E701", "E702",  # schemas/entities 的紧凑单行风格是有意为之
+]
+
+[tool.ruff.lint.per-file-ignores]
+# __init__ 仅为重导出桶
+"**/__init__.py" = ["F401"]

@@ -1,0 +1,8 @@
+{
+  "name": "myoffer-ai-runtime",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.19.0" },
+  "scripts": { "test": "node --test" },
+  "dependencies": { "@earendil-works/pi-ai": "1.0.2" }
+}

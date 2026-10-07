@@ -1,0 +1,436 @@
+# results_B1.yaml — 城市数据扩充 B1 批（33 城，三线 50-119 位）
+# 采集日期: 2026-10-04；口径遵循 EXPANSION_GUIDE.md（city_index.yaml v0.6）
+# 房价口径: 全市二手住宅。gotohui 房价排行页/fangjia.com 城市页为挂牌口径，一律 ×0.92 修正为成交价并在 housing_source 注明；
+#   gotohui 批量页记 2026-09，fangjia.com 城市页直采记 2026-10（当月周度）。
+# 生活成本: 合租单间租金 + 伙食交通约 1000-1200；无租金锚点者用指引先验档并标"经验推断"。
+# 公积金: 市级口径，2026 年度优先；未查到 2026 年度数值的沿用上一年度并如实标 hf_as_of。
+# 标注约定: "推断: ..." 表示数值未经官方原文直接核实，为转载摘要/反推/外推/插值。
+
+中山:
+  hf_bounds: {min: 2300, max: 32969}
+  hf_as_of: "2026-09"
+  hf_source: "上限: 中山市公积金中心2026年度调整(经WebSearch摘要 view.inews.qq.com 2026-08-11: 按市统计局2025年全市城镇非私营单位就业人员年平均工资核定上限32969元，推断为中山口径，建议复核zs.gov.cn)；下限: 2026-09-01起调至2300元、月缴存额下限230元(pub.timedg.com 2026-02及最新通知摘要，旧值2080元作废)"
+  housing_price_per_sqm: 7830
+  housing_month: "2026-09"
+  housing_source: "https://fangjia.gotohui.com/ 2026-09 全国城市二手房价排行: 中山 8515元/㎡(挂牌)；挂牌×0.92=7834，取7830"
+  living_baseline_cost_month: 2300
+  living_basis: "经验推断: 指引三线沿海强市档 2000-2500 取中值；合租单间约 1100-1200 + 伙食交通 1100-1200"
+  rate_override: null
+  rate_note: "继承广东省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+汕头:
+  hf_bounds: {min: 2300, max: 25145.5}
+  hf_as_of: "2026-09"
+  hf_source: "上限: 汕头市公积金中心《关于调整2025年度汕头市职工住房公积金最高缴存额的通知》(m.st001.com 2025-06-28，经WebSearch摘要): 最高缴存基数25145.50元；2026年度通知未检索到，沿用2025年度值。下限: 2026-09-01起广东最低工资上调、公积金下限跟随至2300元(任务口径+中山同日调整印证)，推断"
+  housing_price_per_sqm: 9310
+  housing_month: "2026-09"
+  housing_source: "https://fangjia.gotohui.com/ 2026-09 排行: 汕头 10121元/㎡(挂牌，环比-0.2%)；挂牌×0.92=9311，取9310"
+  living_baseline_cost_month: 2200
+  living_basis: "经验推断: 指引三线沿海强市档 2000-2500 取中低档；合租单间约 1000-1100 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承广东省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+江门:
+  hf_bounds: {min: 2300, max: 27091}
+  hf_as_of: "2026-09"
+  hf_source: "上限: 约27091元为2024年度口径(经WebSearch摘要，按江门上年度在岗职工月平均工资×3)；江门2025-07-31已发布2025年度缴存调整通知(m12333.cn收录)但数值未检索到，2026年度未检索到，沿用2024口径值待复核。下限: 2026-09-01起随广东最低工资上调至2300元(旧值2025-03的1850元已过时，任务口径+中山印证)，推断"
+  housing_price_per_sqm: 4890
+  housing_month: "2026-10"
+  housing_source: "https://jiangmen.fangjia.com/zoushi 江门二手房挂牌均价 5317元/㎡(2026-10当月周度，环比+0.01%)；挂牌×0.92=4892，取4890。注意: 全市口径含台山/开平/恩平/鹤山低值县市"
+  living_baseline_cost_month: 2100
+  living_basis: "经验推断: 指引三线沿海强市档 2000-2500 取低档；合租单间约 900-1000 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承广东省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+盐城:
+  hf_bounds: {min: 2490, max: 31314}
+  hf_as_of: "2026-07"
+  hf_source: "盐城市《关于调整2026年度住房公积金缴存基数的通知》(2026-07-23/25发布，si12333.cn/m12333.cn 收录，经WebSearch摘要): 上限31314元自2026-07-01执行；下限按盐城最低工资分区域执行。推断: 下限取江苏二类最低工资2490(盐城市区档)，县域或执行三类2260，建议复核ycgjj.yancheng.gov.cn。注意: 另见'2025年度上限24545/下限2100'条目(网易2025-12)，与2023年官方28500递推矛盾，疑为其他城市数据误挂，不采信"
+  housing_price_per_sqm: 6390
+  housing_month: "2026-09"
+  housing_source: "https://fangjia.gotohui.com/ 2026-09 排行: 盐城 6948元/㎡(挂牌，环比-1.2%)；挂牌×0.92=6392，取6390"
+  living_baseline_cost_month: 1900
+  living_basis: "租金锚点: 安居客/58 盐城合租单间约450-800元、市区中位约750-800 + 伙食交通约1100-1150(经WebSearch摘要)"
+  rate_override: null
+  rate_note: "继承江苏省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+扬州:
+  hf_bounds: {min: 2490, max: 31618}
+  hf_as_of: "2026-07"
+  hf_source: "扬州市2026年度公积金缴存基数(view.inews.qq.com 2026-07-13《江苏三地区新政落地》，经WebSearch摘要): 执行期2026-07至2027-06，上限31618元、下限2490元，缴存比例5%-12%"
+  housing_price_per_sqm: 8600
+  housing_month: "2026-09"
+  housing_source: "https://fangjia.gotohui.com/ 2026-09 排行: 扬州 9350元/㎡(挂牌，环比+4.6%)；挂牌×0.92=8602，取8600。注意: 环比+4.6%涨幅偏大，建议复核"
+  living_baseline_cost_month: 2100
+  living_basis: "经验推断: 三线普通档上段(苏中租金高于苏北)；合租单间约 900-1000 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承江苏省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+泰州:
+  hf_bounds: {min: 2660, max: 30258}
+  hf_as_of: "2026-01"
+  hf_source: "泰州市公积金中心《关于2026年度住房公积金缴存基数调整的通知》(2025-12发布、2026-01-01执行，经WebSearch摘要): 上限30258元(灵活就业缴存基数区间2660-30258)；下限分区域——海陵区/姜堰区/医药高新区(高港区)约2660元(推断: 2025年度市区下限2490=江苏一类档，2026-01一类调至2660)，靖江/泰兴/兴化较低(约2490)。泰州缴存年度为自然年，故as_of记2026-01"
+  housing_price_per_sqm: 8700
+  housing_month: "2026-09"
+  housing_source: "https://fangjia.gotohui.com/ 2026-09 排行: 泰州 9460元/㎡(挂牌，环比+5.5%)；挂牌×0.92=8703，取8700。注意: 环比+5.5%涨幅偏大，建议复核"
+  living_baseline_cost_month: 2000
+  living_basis: "经验推断: 三线普通档中上段；合租单间约 850-900 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承江苏省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+镇江:
+  hf_bounds: {min: 2660, max: 32400}
+  hf_as_of: "2026-07"
+  hf_source: "镇江市《关于调整2026年度住房公积金缴存基数的通知》(2026-07-15，m12333.cn收录；数值经WebSearch摘要): 上限32400元、下限2660元(镇江市=江苏一类最低工资档)自2026-07执行。中等可信(转载摘要值)，建议复核zhenjiang公积金官网"
+  housing_price_per_sqm: 6740
+  housing_month: "2026-09"
+  housing_source: "https://fangjia.gotohui.com/ 2026-09 排行: 镇江 7328元/㎡(挂牌，环比+4.3%)；挂牌×0.92=6742，取6740"
+  living_baseline_cost_month: 2000
+  living_basis: "经验推断: 三线普通档中上段(苏南生活成本略高但租金温和)；合租单间约 850 + 伙食交通 1150"
+  rate_override: null
+  rate_note: "继承江苏省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+淮安:
+  hf_bounds: {min: 2490, max: 28800}
+  hf_as_of: "2026-07"
+  hf_source: "推断: 淮安2026年度缴存基数通知未检索到(搜索3轮)。最近官方锚点为2024年度上限27200元/下限2260元(江苏省委新闻网zgjssw.gov.cn 2024-04-03)。上限按江苏各市2026年度普遍上调5-6%外推≈28800；下限按2026-01江苏二类最低工资2490(2024年下限2260=当时二类档的同口径递推)"
+  housing_price_per_sqm: 5500
+  housing_month: "2026-06"
+  housing_source: "知乎2026-06 江苏13市房价统计(经WebSearch摘要): 淮安全市二手挂牌均价约5977元/㎡；挂牌×0.92≈5500。注意: 与盐城6948(挂牌)相比淮安略低，量级一致"
+  living_baseline_cost_month: 1800
+  living_basis: "租金锚点: 清江浦区合租单间普遍500-800元(经WebSearch摘要)取约700 + 伙食交通约1100"
+  rate_override: null
+  rate_note: "继承江苏省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+宿迁:
+  hf_bounds: {min: 2260, max: 27500}
+  hf_as_of: "2026-07"
+  hf_source: "推断: 宿迁2026/2025年度缴存基数官方数值均未检索到(搜索3轮，仅见2026-09贷款新政)。上限按苏北各市2026年度值(连云港31545/盐城31314/徐州32917)以宿迁为全省最低插值≈27500；下限按江苏三类最低工资2260(宿迁县域档，市区或执行二类2490)，均待复核gjj.suqian.gov.cn"
+  housing_price_per_sqm: 5180
+  housing_month: "2026-10"
+  housing_source: "https://suqian.fangjia.com/zoushi 宿迁二手房挂牌均价 5627元/㎡(2026-10当月周度，环比-0.47%)；挂牌×0.92=5177，取5180"
+  living_baseline_cost_month: 1700
+  living_basis: "租金锚点: 宿城区合租单间约400-700元、一室一厅40㎡约600元(房天下/58，经WebSearch摘要)取约600 + 伙食交通约1100；低于三线普通档下沿，系宿迁为苏北最低租金梯队"
+  rate_override: null
+  rate_note: "继承江苏省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+连云港:
+  hf_bounds: {min: 2260, max: 31545}
+  hf_as_of: "2026-07"
+  hf_source: "连云港2026年度公积金缴存基数(经WebSearch摘要，市政府/灌云县政府网转载): 上限31545元、月缴存额上限7570元(单位/个人各3785元)、下限2260元(江苏三类最低工资档)。旁证: lyg.gov.cn 2026-01-07 发布会及'一图读懂'确认调整"
+  housing_price_per_sqm: 7170
+  housing_month: "2026-09"
+  housing_source: "https://fangjia.gotohui.com/ 2026-09 排行: 连云港 7793元/㎡(挂牌，环比+2.6%)；挂牌×0.92=7170"
+  living_baseline_cost_month: 1900
+  living_basis: "经验推断: 三线普通档；合租单间约 750-800 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承江苏省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+济宁:
+  hf_bounds: {min: 2020, max: 24410}
+  hf_as_of: "2025-07"
+  hf_source: "济宁2025年度缴存基数(经WebSearch摘要): 上限24410元(按2024年度济宁城镇非私营单位从业人员月均工资×3)；下限按山东最低工资各区县执行，摘要称济宁执行2020元档(鲁政字〔2025〕140号；山东三档推断为2210/2020/1820，与临沂2026市辖区2210、菏泽官方2020互证)。2026年度通知未检索到(山东年度7月切换)，如实沿用2025年度值；下限市区档或为2210，建议复核gjj.jining.gov.cn"
+  housing_price_per_sqm: 4550
+  housing_month: "2026-10"
+  housing_source: "https://jining.fangjia.com/zoushi 济宁二手房挂牌均价 4941元/㎡(2026-10当月周度，环比+2.91%)；挂牌×0.92=4546，取4550。注意: 全市含县口径，接近三线sanity下限"
+  living_baseline_cost_month: 1900
+  living_basis: "经验推断: 三线普通档中值；合租单间约 750-800 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承山东省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+菏泽:
+  hf_bounds: {min: 2020, max: 21366}
+  hf_as_of: "2025-07"
+  hf_source: "菏泽市公积金中心《关于2025年度住房公积金最高和最低缴存基数的通知》(菏住金〔2025〕7号，heze.gov.cn官网，经WebSearch摘要): 2025-07-01至2026-06-30汇缴年度上限21366元(在岗职工月均×3)；下限=菏泽月最低工资2020元(鲁政字〔2025〕140号)。2026年度通知已发布(163.com'网聚菏泽聚硕'2026-06-26、m12333政策解读)但数值未检索到，如实沿用2025年度值"
+  housing_price_per_sqm: 3860
+  housing_month: "2026-10"
+  housing_source: "https://heze.fangjia.com/zoushi 菏泽二手房挂牌均价 4192元/㎡(2026-10当月周度，环比+0.93%)；挂牌×0.92=3857，取3860。异常提示: 低于三线sanity带下限4500，系全市含县(曹县/单县/郓城等)+2026行情下行，建议主智能体复核"
+  living_baseline_cost_month: 1700
+  living_basis: "经验推断: 指引劳务输出市档 1500-1900 取中低档；合租单间约 550-600 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承山东省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+淄博:
+  hf_bounds: {min: 2210, max: 26736.5}
+  hf_as_of: "2026-07"
+  hf_source: "淄博2026年度缴存基数上限26736.5元(经WebSearch摘要两处一致: 上年全市在岗职工月均×3；2026-07-08《关于做好2026年度住房公积金缴存基数和缴存比例调整工作的通知》见zibo.gov.cn政务公开)；旁证: 2023年度官方上限24683.5元(zibo.dzwww.com)，年增3.3%一致。下限推断=山东一类最低工资2210(与临沂2026市辖区档一致)，建议复核"
+  housing_price_per_sqm: 4460
+  housing_month: "2026-10"
+  housing_source: "https://zibo.fangjia.com/zoushi 淄博二手房挂牌均价 4848元/㎡(2026-10当月周度，环比+1.04%)；挂牌×0.92=4460。注意: 全市含桓台/高青/沂源等县，略低于三线sanity下限4500"
+  living_baseline_cost_month: 1900
+  living_basis: "经验推断: 三线普通档中值；合租单间约 750-800 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承山东省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+邯郸:
+  hf_bounds: {min: 2200, max: 23229}
+  hf_as_of: "2025-07"
+  hf_source: "邯郸2025年度缴存基数上限23229元(12333si.com 2025-07-03、renshebao.com 2025-07-11，经WebSearch摘要: 上年在岗职工月均×3)；下限2200元为2025年度官方主城区档(丛台/邯山/复兴/武安，housefund.hd.gov.cn官网通知，经开区/冀南新区/永年2000元、县域更低)。2026年度数值未检索到，如实沿用2025年度值"
+  housing_price_per_sqm: 7730
+  housing_month: "2026-09"
+  housing_source: "https://fangjia.gotohui.com/ 2026-09 排行: 邯郸 8402元/㎡(挂牌，环比+1.7%)；挂牌×0.92=7730"
+  living_baseline_cost_month: 1900
+  living_basis: "经验推断: 三线普通档中值；合租单间约 750 + 伙食交通 1150"
+  rate_override: null
+  rate_note: "继承河北省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+唐山:
+  hf_bounds: {min: 2380, max: 25635}
+  hf_as_of: "2026-07"
+  hf_source: "上限25635元: news.qq.com 2026-08-14《河北2026年社保新政密集落地》(各市公积金上限挂钩社平×3: 唐山25635)，与2025年度官方24612元(163.com 2025-07-26)、2024年度23862元递推一致；下限2380元: 唐山信息港tsxxg.com 2026年唐山公积金缴费基数(2026年最低工资上调后口径)"
+  housing_price_per_sqm: 7000
+  housing_month: "2026-09"
+  housing_source: "https://fangjia.gotohui.com/ 2026-09 排行: 唐山 7614元/㎡(挂牌，环比+2.0%)；挂牌×0.92=7005，取7000"
+  living_baseline_cost_month: 2100
+  living_basis: "经验推断: 指引三线沿海强市档 2000-2500 取低档；合租单间约 950-1000 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承河北省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+沧州:
+  hf_bounds: {min: 2200, max: 25581}
+  hf_as_of: "2026-07"
+  hf_source: "上限25581元: news.qq.com 2026-08-14《河北2026年社保新政密集落地》(沧州公积金缴存基数上限，挂钩社平×3)。下限推断=河北一类最低工资2200(2023-01标准，与results_A2保定同口径)；注意: 唐山2026年公积金下限已按2380执行(tsxxg.com)，若河北最低工资2026年已上调，沧州下限或同步至2380，建议复核"
+  housing_price_per_sqm: 7580
+  housing_month: "2026-09"
+  housing_source: "https://fangjia.gotohui.com/ 2026-09 排行: 沧州 8243元/㎡(挂牌，环比+4.9%)；挂牌×0.92=7584，取7580"
+  living_baseline_cost_month: 1900
+  living_basis: "经验推断: 三线普通档中值；合租单间约 750-800 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承河北省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+廊坊:
+  hf_bounds: {min: 2200, max: 30261}
+  hf_as_of: "2026-07"
+  hf_source: "上限30261元: news.qq.com 2026-08-14《河北2026年社保新政密集落地》(廊坊公积金缴存基数上限，'这批城市里的高地')；下限推断=河北一类最低工资2200(2023-01标准)；同沧州注: 若河北最低工资2026年上调(唐山2380佐证)，廊坊下限或同步至2380，建议复核"
+  housing_price_per_sqm: 8390
+  housing_month: "2026-09"
+  housing_source: "https://fangjia.gotohui.com/ 2026-09 排行: 廊坊 9114元/㎡(挂牌，环比+7.0%)；挂牌×0.92=8385，取8390。注意: 挂牌值在环京经验带9000-11000内，修正后略低于带下沿；环比+7.0%涨幅偏大，建议复核"
+  living_baseline_cost_month: 2100
+  living_basis: "经验推断: 三线普通档上段(环京通勤群体支撑租金)；合租单间约 950-1000 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承河北省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+南阳:
+  hf_bounds: {min: 2350, max: 18553.5}
+  hf_as_of: "2026-07"
+  hf_source: "上限18553.5元: 按南阳市统计局2025年全市城镇非私营在岗职工年均工资74214元×3÷12(sohu 2026-08-25、news.qq.com 2026-08-18河南汇总，经WebSearch摘要)；下限2350元=河南省直/一类最低工资口径(henan.sina.cn 2026-07-02河南省直2026年度下限2350；焦作市区同口径印证)"
+  housing_price_per_sqm: 4450
+  housing_month: "2026-10"
+  housing_source: "https://nanyang.fangjia.com/zoushi 南阳二手房挂牌均价 4841元/㎡(2026-10当月周度，环比-0.12%)；挂牌×0.92=4454，取4450。注意: 全市含县口径，略低于三线sanity下限4500"
+  living_baseline_cost_month: 1700
+  living_basis: "经验推断: 指引劳务输出市档 1500-1900 取中低档；合租单间约 550-650 + 伙食交通 1050-1100"
+  rate_override: null
+  rate_note: "继承河南省级口径（河南2026年度社保基数未公布，as_of以郑州2025-07锚为准，由主智能体合并计算）"
+  rank_note: "2025 第一财经榜单三线"
+
+新乡:
+  hf_bounds: {min: 2350, max: 21500}
+  hf_as_of: "2026-07"
+  hf_source: "推断: 新乡2026/2025年度缴存基数官方数值均未检索到(搜索3轮+官网xxzfgjj.com抓取，仅见2026-09-03'完成2026年度基数调整'新闻无数值；sohu 2025-07-15某市2025年度上限24420元因城市未确证不采信)。上限按河南同类口径(非私营在岗年均×3÷12)在洛阳23914与南阳18553.5之间按新乡经济体量插值≈21500；下限2350=河南省直/一类档口径推断，均待复核xxzfgjj.com"
+  housing_price_per_sqm: 4020
+  housing_month: "2026-10"
+  housing_source: "https://xinxiang.fangjia.com/zoushi 新乡二手房挂牌均价 4373元/㎡(2026-10当月周度，环比+3.72%)；挂牌×0.92=4023，取4020。异常提示: 低于三线sanity下限4500，全市含县(辉县/获嘉/原阳等)+行情下行，建议复核"
+  living_baseline_cost_month: 1600
+  living_basis: "经验推断: 指引劳务输出市档 1500-1900 取低档；合租单间约 500 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承河南省级口径（河南2026年度社保基数未公布，as_of以郑州2025-07锚为准）"
+  rank_note: "2025 第一财经榜单三线"
+
+周口:
+  hf_bounds: {min: 2350, max: 18390}
+  hf_as_of: "2026-07"
+  hf_source: "推断: 周口2026年度官方数值未检索到(周住金〔2025〕15号见zc.51shebao.com但正文无数值)。上限按周口市统计局2025年城镇非私营单位就业人员年均工资73558元×3÷12≈18390(tjj.zhoukou.gov.cn，经WebSearch摘要)——口径为'就业人员'非'在岗职工'，或略低估；下限2350=河南省直/一类档推断(周口县域实际最低工资档更低)，均待复核zfgjj.zhoukou.gov.cn"
+  housing_price_per_sqm: 3210
+  housing_month: "2026-10"
+  housing_source: "https://zhoukou.fangjia.com/zoushi 周口二手房挂牌均价 3486元/㎡(2026-10当月周度，环比+1.10%)；挂牌×0.92=3207，取3210。异常提示: 显著低于三线sanity下限4500，系劳务输出市+全市含县(项城/鹿邑/太康等)+行情下行，为全省屋底区间，建议主智能体复核"
+  living_baseline_cost_month: 1500
+  living_basis: "经验推断: 指引劳务输出市档 1500-1900 取下沿；合租单间约 400-450 + 伙食交通 1050"
+  rate_override: null
+  rate_note: "继承河南省级口径（河南2026年度社保基数未公布，as_of以郑州2025-07锚为准）"
+  rank_note: "2025 第一财经榜单三线"
+
+商丘:
+  hf_bounds: {min: 2350, max: 17700}
+  hf_as_of: "2026-07"
+  hf_source: "推断: 商丘2026年度通知已发布(2026-07-27，si12333.cn/m12333.cn收录)但数值未检索到(搜索3轮)。锚点: 2023年度官方上限16870元/月缴存额4048元；本地宝口径月缴存额上限1778×2(对应基数≈14816)疑为2021年旧值。上限按2023官方值随河南同类市年增约3%外推≈17700；下限2350=河南省直/一类档推断，均待复核"
+  housing_price_per_sqm: 4800
+  housing_month: "2026-09"
+  housing_source: "全国房价排行(gotohui系) 2026-09 商丘二手均价5211元/㎡(同比-14.4%)×0.92≈4794，取4800；交叉: 房天下2026-09挂牌4804、安居客挂牌5332(经WebSearch摘要)，口径一致"
+  living_baseline_cost_month: 1500
+  living_basis: "经验推断: 指引劳务输出市档 1500-1900 取下沿；合租单间约 400-450 + 伙食交通 1050"
+  rate_override: null
+  rate_note: "继承河南省级口径（河南2026年度社保基数未公布，as_of以郑州2025-07锚为准）"
+  rank_note: "2025 第一财经榜单三线"
+
+襄阳:
+  hf_bounds: {min: 2400, max: 22836}
+  hf_as_of: "2026-07"
+  hf_source: "襄阳市2026年度公积金缴存基数(sohu 2026-07-08报道，经WebSearch摘要): 上限22836元(月缴存额上限合计5481元，22836×24%一致)；下限按各县(市、区)最低工资分档，襄城区/樊城区2400元(月缴存额最低240元)。旁证: 2024年度上限21826元，年增一致"
+  housing_price_per_sqm: 4810
+  housing_month: "2026-10"
+  housing_source: "https://xiangyang.fangjia.com/zoushi 襄阳二手房挂牌均价 5227元/㎡(2026-10当月周度，环比-2.11%)；挂牌×0.92=4809，取4810"
+  living_baseline_cost_month: 1800
+  living_basis: "经验推断: 三线普通档中值(湖北省域副中心)；合租单间约 650-700 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承湖北省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+芜湖:
+  hf_bounds: {min: 2170, max: 25992}
+  hf_as_of: "2025-09"
+  hf_source: "芜湖2026年度缴存基数通知未检索到具体数值，沿用2025年度: 上限25992元；下限1930元自2025-09起调整为2170元(安徽一类最低工资档；经WebSearch摘要，2025-07-25 sohu及下限调整通知file.m12333.cn)。2026年度上限按芜湖2025年非私营月均×3核定、预计25992基础上略上调，待复核gjj.wuhu.gov.cn"
+  housing_price_per_sqm: 7950
+  housing_month: "2026-09"
+  housing_source: "https://fangjia.gotohui.com/ 2026-09 排行: 芜湖 8638元/㎡(挂牌，环比+5.0%)；挂牌×0.92=7947，取7950。注意: 任务提示芜湖经验带9000-10000，本值(挂牌8638)低于带下沿，系全市含南陵/湾沚/繁昌低值区+行情下行"
+  living_baseline_cost_month: 2000
+  living_basis: "经验推断: 三线沿海/强地级市档 2000-2500 取下沿(安徽第二城)；合租单间约 850-900 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承安徽省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+阜阳:
+  hf_bounds: {min: 2060, max: 23817}
+  hf_as_of: "2026-07"
+  hf_source: "阜阳市《关于调整阜阳市2026年度住房公积金缴存基数的通知》(阜公积金〔2026〕，2026-06-23发布，经WebSearch摘要): 上限23817元(阜阳2025年城镇非私营就业人员年均工资95268元÷12×3)；下限推断=安徽二类最低工资2060(安徽2025-09调整后一类2170，芜湖下限2170印证；阜阳市区档取二类)，待复核"
+  housing_price_per_sqm: 5700
+  housing_month: "2026-05"
+  housing_source: "知乎专栏2026-05(经WebSearch摘要): 阜阳二手房成交均价约5600-5800元/㎡(居安徽中游，高于滁州/宿州/淮北5000-5300，低于芜湖/合肥)——成交口径直取，不做挂牌修正。注意: 与2025年全市二手约7332-7400(挂牌口径)存在明显落差，采信成交口径"
+  living_baseline_cost_month: 1700
+  living_basis: "经验推断: 指引劳务输出市档 1500-1900 取中低档；合租单间约 550-600 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承安徽省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+滁州:
+  hf_bounds: {min: 2221, max: 25145}
+  hf_as_of: "2026-08"
+  hf_source: "滁州市《关于做好2026年度住房公积金缴存基数及月缴存额调整工作的通知》(2026-08-21，m12333.cn收录；数值经ah.ifeng.com 2026-08-23报道摘要): 上限25145元、下限2221元。旁证: 2025年度滁州上限25004元、2024年度24695元，趋势吻合"
+  housing_price_per_sqm: 4060
+  housing_month: "2026-10"
+  housing_source: "https://chuzhou.fangjia.com/zoushi 滁州二手房挂牌均价 4412元/㎡(2026-10当月周度，环比-1.99%)；挂牌×0.92=4059，取4060。异常提示: 低于三线sanity下限4500，系全市含来安/全椒/定远/凤阳等县+行情下行"
+  living_baseline_cost_month: 1800
+  living_basis: "经验推断: 三线普通档中低段(宁滁一体化但本地租金低)；合租单间约 650 + 伙食交通 1150"
+  rate_override: null
+  rate_note: "继承安徽省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+赣州:
+  hf_bounds: {min: 1950, max: 24304}
+  hf_as_of: "2026-07"
+  hf_source: "赣州市公积金中心《关于确定2026年我市住房公积金缴存基数及月缴存额上下限的通知》https://zfgjj.ganzhou.gov.cn/gzszfjj/c103430/202607/616e6f447b994708997219f5e2e1748f.shtml (经WebSearch摘要): 按赣州2025年度城镇非私营在岗职工月均工资×3和2026年最低工资核算，上限24304元、下限1950元"
+  housing_price_per_sqm: 7440
+  housing_month: "2026-09"
+  housing_source: "https://fangjia.gotohui.com/ 2026-09 排行: 赣州 8091元/㎡(挂牌，环比+3.1%)；挂牌×0.92=7444，取7440"
+  living_baseline_cost_month: 1800
+  living_basis: "经验推断: 三线普通档中低段(赣南)；合租单间约 650-700 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承江西省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+上饶:
+  hf_bounds: {min: 1950, max: 23083}
+  hf_as_of: "2026-07"
+  hf_source: "上饶市《关于公布2026年度住房公积金缴存上下限标准的通知》(junrunrenli.com转载，经WebSearch摘要): 2026年缴存额上限5540元/月(单位+个人两部分)，基数上限按5540÷24%反推≈23083；下限=2025年月最低工资×5%×2，推断基数下限1950(与赣州2026年最低工资档同省口径)。中等可信(反推值+转载)，建议复核"
+  housing_price_per_sqm: 4800
+  housing_month: "2026-10"
+  housing_source: "https://shangrao.fangjia.com/zoushi 上饶房产均价 5222元/㎡(2026-10当月周度，环比-0.77%)；×0.92=4804，取4800。注意: 该页措辞为'房产均价'，疑似与其他城市'二手房均价'同系列但措辞不严，建议复核"
+  living_baseline_cost_month: 1700
+  living_basis: "经验推断: 三线普通档中低段；合租单间约 550-600 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承江西省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+湖州:
+  hf_bounds: {min: 2490, max: 28500}
+  hf_as_of: "2026-07"
+  hf_source: "推断: 湖州2025/2026年度缴存基数官方数值均未检索到(搜索3轮，浙江省2026年度调整已于2026-07-13启动、杭州2026上限42151/下限2660)。上限按浙江地级市2026年度值(绍兴31967/金华31911/台州26000/嘉兴34900)以湖州经济体量插值≈28500；下限按湖州市区执行的浙江最低工资档取2490(2026年或已上调至2660/2440档，杭州2660印证)，均待复核gjj.huzhou.gov.cn"
+  housing_price_per_sqm: 8550
+  housing_month: "2026-09"
+  housing_source: "https://fangjia.gotohui.com/ 2026-09 排行: 湖州 9296元/㎡(挂牌，环比+9.2%)；挂牌×0.92=8552，取8550。注意: 环比+9.2%为全榜最大异动，建议主智能体复核"
+  living_baseline_cost_month: 2100
+  living_basis: "经验推断: 三线沿海强市档 2000-2500 取低段(浙江生活成本略高)；合租单间约 900-1000 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承浙江省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+桂林:
+  hf_bounds: {min: 2200, max: 21000}
+  hf_as_of: "2025-07"
+  hf_source: "下限2200元: 桂公积发〔2025〕9号及桂视网2025-07-14(经WebSearch摘要): 自2025-07-01起新开户缴存人基数下限由1990调整为2200元；上限推断≈21000(按桂林非私营在岗年均约84000元×3÷12估，与广西区直/南宁量级一致)，2025/2026年度官方上限均未检索到，待复核glgjj.gov.cn"
+  housing_price_per_sqm: 4470
+  housing_month: "2026-10"
+  housing_source: "https://guilin.fangjia.com/zoushi 桂林二手房挂牌均价 4854元/㎡(2026-10当月周度，环比+0.22%)；挂牌×0.92=4466，取4470。注意: 全市含县(荔浦/全州/兴安等)口径，贴近三线sanity下限4500"
+  living_baseline_cost_month: 1800
+  living_basis: "经验推断: 三线普通档中低段(旅游城市消费低租金低)；合租单间约 650-700 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承广西省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+咸阳:
+  hf_bounds: {min: 2376, max: 21000}
+  hf_as_of: "2026-07"
+  hf_source: "下限2376元(秦都区/渭城区): 咸阳市公积金中心调整缴存基数下限公告(依据陕西〔2026〕1号最低工资文件，news.qq.com 2026年报道，经WebSearch摘要；旧值2160元作废)，县域按当地最低工资更低；上限推断≈21000(按咸阳非私营在岗年均约84000元×3÷12估，约为西安的75-80%)，2025/2026年度官方上限均未检索到，待复核"
+  housing_price_per_sqm: 4690
+  housing_month: "2026-10"
+  housing_source: "https://xianyang.fangjia.com/zoushi 咸阳二手房挂牌均价 5102元/㎡(2026-10当月周度，环比+1.35%)；挂牌×0.92=4694，取4690"
+  living_baseline_cost_month: 1700
+  living_basis: "经验推断: 三线普通档中低段(西咸同城但本地租金低)；合租单间约 550-600 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承陕西省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+漳州:
+  hf_bounds: {min: 2195, max: 23800}
+  hf_as_of: "2026-07"
+  hf_source: "推断: 漳州2026年度调整批复已于2026-06-25发布(m12333.cn收录《关于调整2026年度漳州市住房公积金缴存基数的批复》)但数值未检索到(搜索2轮)；上限按福建同口径(泉州2026上限24795、漳州社平略低)估≈23800；下限按福建一类最低工资档2195(泉州2026市区档2195同口径)，均待复核"
+  housing_price_per_sqm: 9230
+  housing_month: "2026-09"
+  housing_source: "https://fangjia.gotohui.com/ 2026-09 排行: 漳州 10037元/㎡(挂牌，环比+8.4%，上月9261)；挂牌×0.92=9234，取9230。注意: 环比+8.4%为全榜第二大异动，建议主智能体复核"
+  living_baseline_cost_month: 2000
+  living_basis: "经验推断: 三线沿海档 2000-2500 取下沿；合租单间约 850-900 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承福建省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+遵义:
+  hf_bounds: {min: 1890, max: 25392}
+  hf_as_of: "2025-07"
+  hf_source: "2025年度缴存基数(贵州媒体报道2025-08-20，经WebSearch摘要，疑为遵义或贵州省直口径、转载中等可信): 上限25392元、月缴存额上限6094元(25392×24%一致)、下限1890元、月缴存额下限190元。2026年度通知未检索到，沿用2025年度值；下限1890对应县域最低工资档，市区或更高，建议复核gjj.zunyi.gov.cn"
+  housing_price_per_sqm: 3820
+  housing_month: "2026-09"
+  housing_source: "zunyi.esf.fang.com(房天下遵义，经WebSearch摘要): 2026-09前两周挂牌均价4145元/平、第3周4166元/平(环比基本持平)，取中值4155×0.92=3823，取3820。异常提示: 低于三线sanity下限4500，系全市含县(仁怀/赤水/习水等)+行情下行"
+  living_baseline_cost_month: 1700
+  living_basis: "经验推断: 三线普通档中低段；合租单间约 550-600 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承贵州省级口径"
+  rank_note: "2025 第一财经榜单三线"
+
+绵阳:
+  hf_bounds: {min: 2200, max: 25365}
+  hf_as_of: "2025-07"
+  hf_source: "《绵住房公积金发〔2025〕17号》(绵阳市公积金管委会文件，zc.51shebao.com收录，经WebSearch摘要): 2025年度(依据绵阳2024年全市平均工资和市政府月最低工资)上限25365元、下限2200元。2026年度通知未检索到，沿用2025年度值。注意: 另见2024年度上限25571元>2025年度25365元的回落，口径或有小改，建议复核"
+  housing_price_per_sqm: 4420
+  housing_month: "2026-10"
+  housing_source: "https://mianyang.fangjia.com/zoushi 绵阳二手房挂牌均价 4801元/㎡(2026-10当月周度，环比+0.48%)；挂牌×0.92=4417，取4420。注意: 全市含县口径，贴近三线sanity下限4500"
+  living_baseline_cost_month: 1800
+  living_basis: "经验推断: 三线普通档中低段(四川第二城但租金温和)；合租单间约 650-700 + 伙食交通 1100"
+  rate_override: null
+  rate_note: "继承四川省级口径"
+  rank_note: "2025 第一财经榜单三线"

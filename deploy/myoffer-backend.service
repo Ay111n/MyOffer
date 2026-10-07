@@ -1,0 +1,59 @@
+[Unit]
+Description=MyOffer backend (FastAPI + uvicorn, single worker)
+Documentation=file:/srv/myoffer/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=myoffer
+Group=myoffer
+WorkingDirectory=/srv/myoffer/backend
+EnvironmentFile=/srv/myoffer/.env
+
+# 单 worker 是刻意的，不是省事：
+#   - rate_limit.py 的计数在进程内存里 → 多 worker 会各算一份，限流失效
+#   - 每个 worker 都有独立的临时比较状态，用户请求可能落到另一个空实例
+# 2 核机器上单 worker + 线程池足够（实测写请求 CPU 最坏 43 ms）。
+#
+# --proxy-headers + --forwarded-allow-ips 127.0.0.1：
+#   全部流量经本机 nginx 反代。不启用时 request.client.host 恒为 127.0.0.1，
+#   按 IP 的限流（创建会话 30/min）会变成全站共享一个桶——攻击者可 30 个
+#   请求把新用户创建会话挡 1 分钟。启用后仅信任本机 nginx 覆盖式提供的
+#   X-Forwarded-For（nginx 侧用 $remote_addr，客户端伪造无效）。
+ExecStart=/srv/myoffer/backend/.venv/bin/uvicorn app.main:app \
+    --host 127.0.0.1 \
+    --port 8000 \
+    --workers 1 \
+    --proxy-headers \
+    --forwarded-allow-ips 127.0.0.1 \
+    --limit-concurrency 32 \
+    --backlog 64 \
+    --timeout-keep-alive 30 \
+    --no-access-log
+
+Restart=always
+RestartSec=3
+KillSignal=SIGINT
+TimeoutStopSec=20
+
+# ── 内存护栏（2GB 总盘的防互相挤占）───────────────────────────────
+# 实测后端常驻约 82.5 MB；给 5 倍余量应付峰值和请求突发。
+# MemoryHigh 触发回收但不杀进程，MemoryMax 是硬上限。比较状态随进程保存在内存中。
+MemoryHigh=350M
+MemoryMax=450M
+
+# ── 最小权限 ──────────────────────────────────────────────────────
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/myoffer/backend
+# uvicorn 只监听 127.0.0.1，不需要任何网络能力提升
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

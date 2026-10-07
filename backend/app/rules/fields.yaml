@@ -1,0 +1,1158 @@
+meta:
+  registry_version: "0.1"
+  # evidence_class 标注证据性质，缺省 factual：
+  #   factual        可核实的客观信息（offer/合同/当事人陈述）
+  #   perception     用户主观认知（低可靠度辅助信息）
+  #   classification 分类标签，仅用于解释与后续岗位模板，不进评分
+  #
+  # evidence_category 标注「什么来源对这类事实有多大证明力」，与业务分类
+  # （薪酬/岗位/平台）无关，只服务可靠度计算 reliability.yaml#field_applicability。
+  # 每个字段必须声明，取值范围由启动校验（validate.py）保证：
+  #   contractual_fact  合同/Offer 条款类客观事实（主体、服务期、工时制度）
+  #   compensation_fact 薪酬数字（奖金、股权、公积金、补贴）
+  #   work_experience   工作实际体验（真实工时、内容、成长）
+  #   team_status       团队/组织状态（缩编、绩效压力、拖欠）
+  #   business_strategy 业务战略位置与趋势
+  #   market_perception 用户对市场竞争力的认知（低可靠度辅助）
+  #   personal_context  用户个人情境（如生活开支预估），来源只有本人
+  evidence_categories:
+    - contractual_fact
+    - compensation_fact
+    - work_experience
+    - team_status
+    - business_strategy
+    - market_perception
+    - personal_context
+
+  # 各证据类别在 UI 上可选择的来源集合：按所属方面裁剪，明显不合理
+  # 的来源组合直接不出现（如「Offer 条款」不是裁员风险的来源、「官方文件」
+  # 不适用于市场认知）。不在列表内的来源对该类字段不可选；
+  # 题内推荐顺序另见 questions.yaml recommended_sources，可靠度见 reliability.yaml。
+  # 放松原则：只硬排除明显不具备证明意义的来源（如 Offer 条款不会描述裁员风险），
+  # 弱来源保留在「其他来源」里，由 field_applicability 降低可靠度，忠实记录 provenance。
+  applicable_sources:
+    contractual_fact: [offer_letter, official_document, hr, hiring_manager, interviewer,
+                       self_experience, teammate, company_employee, alumni, online_consensus,
+                       anonymous_online, assumption]
+    compensation_fact: [offer_letter, hr, official_document, hiring_manager, interviewer,
+                        self_experience, teammate, company_employee, alumni, online_consensus,
+                        anonymous_online, assumption]
+    work_experience: [self_experience, offer_letter, official_document, hr, hiring_manager,
+                      interviewer, teammate, alumni, online_consensus, anonymous_online, assumption]
+    team_status: [teammate, hiring_manager, interviewer, hr, self_experience, company_employee,
+                  official_document, alumni, online_consensus, anonymous_online, assumption]
+    business_strategy: [hiring_manager, teammate, interviewer, official_document, company_employee,
+                        hr, self_experience, alumni, online_consensus, anonymous_online, assumption]
+    market_perception: [online_consensus, self_experience, alumni, company_employee,
+                        teammate, interviewer, hiring_manager, hr, official_document,
+                        offer_letter, anonymous_online, assumption]
+    personal_context: [self_experience, alumni, teammate, online_consensus, assumption]
+
+# ─────────────────────────────────────────────
+# 1. 录入基本信息（v0.6：创建表单全部选填，城市/薪资改由第一轮
+#    「薪酬社保」板块的问题节点采集；required_level: core 仅表示
+#    决策必需度，不再代表创建表单必填）
+# ─────────────────────────────────────────────
+city:
+  value_type: text
+  evidence_category: contractual_fact
+  unit: city
+  required_level: core
+  collection: initial_questions
+  metrics: [purchasing_power, disposable_monthly]
+  # 城市 universe 白名单与写入前规范化（data/city_index.yaml 为唯一事实源）：
+  # allowed_from 限定合法取值（越界 → unsupported_city），normalize 声明
+  # 写入前规范化规则（去空白、去尾部「市」，与前端 normalizeCity 同口径）。
+  allowed_from: city_index.supported_cities
+  normalize: city_name
+
+monthly_base:
+  value_type: money
+  min: 1
+  max: 1000000                # 覆盖全部合理薪资，拦截 1e12 级异常输入
+  evidence_category: contractual_fact
+  unit: CNY/month
+  required_level: core
+  collection: initial_questions
+  metrics: [guaranteed_cash, expected_cash, income_certainty,
+            after_tax_monthly, disposable_monthly, effective_hourly]
+
+guaranteed_salary_months:
+  value_type: number
+  min: 1
+  max: 16                     # 固定薪数上限：市面最高 16 薪制
+  evidence_category: contractual_fact
+  unit: months/year          # 固定薪数（合同保证部分），与浮动奖金月数明确区分
+  required_level: core
+  collection: initial_questions
+  metrics: [guaranteed_cash, expected_cash]
+
+# ─────────────────────────────────────────────
+# 2. 薪酬社保 / 福利补贴（第一轮；q_comp_structure / q_housing_expense / q_benefits）
+# ─────────────────────────────────────────────
+annual_bonus_months:
+  value_type: number           # ≥0，0.5 月步进；0=明确无奖金
+  min: 0
+  max: 12
+  evidence_category: compensation_fact
+  unit: months/year
+  required_level: optional
+  collection: initial_questions
+  metrics: [expected_cash, income_certainty]
+
+bonus_certainty:
+  value_type: enum
+  evidence_category: compensation_fact
+  options:
+    - {value: guaranteed, label: 合同/offer 明确固定}
+    - {value: typical_range, label: 有大致区间}
+    - {value: vague, label: 说不清/看绩效}
+  required_level: optional
+  collection: initial_questions
+  metrics: [expected_cash, income_certainty]
+
+signing_bonus:
+  value_type: money            # ≥0；0=明确无
+  evidence_category: compensation_fact
+  unit: CNY total
+  ui_group: signing_bonus_bundle
+  ui_role: amount
+  default_value: 0
+  required_level: optional
+  collection: initial_questions
+  metrics: [entry_income]
+
+government_talent_subsidy:
+  value_type: money
+  min: 0
+  evidence_category: compensation_fact
+  unit: CNY total
+  default_value: 0
+  required_level: optional
+  collection: initial_questions
+  metrics: [entry_income]
+
+monthly_subsidies:
+  value_type: money
+  evidence_category: compensation_fact
+  unit: CNY/month            # 餐补/交通/通讯等月度补贴合计
+  ui_group: subsidy_bundle
+  ui_role: amount
+  default_value: 0
+  required_level: optional
+  collection: initial_questions
+  metrics: [expected_cash, disposable_monthly]
+
+housing_fund_employee_rate:
+  value_type: percent          # 0–12%，0.5% 步进
+  min: 0
+  max: 12                     # 政策上限：住房公积金缴存比例最高 12%
+  evidence_category: compensation_fact
+  unit: "%"                  # 个人缴存比例：减少当期税后现金
+  # 2026-10-05 调整：12 → 8。法规区间 5%-12%，国企/大厂常见 12%，民企主流 5%-8%；
+  # 兜底估算取偏保守中位（8%），避免对体制外 Offer 的公积金现金流（hf_annual 计入
+  # 到手现金）与五险一金分双抬高。用户按 offer 实际填写时不受影响。
+  default_value: 8
+  required_level: optional
+  collection: initial_questions
+  metrics: [after_tax_monthly, disposable_monthly]
+
+housing_fund_employer_rate:
+  value_type: percent          # 0–12%，0.5% 步进
+  min: 0
+  max: 12                     # 政策上限：住房公积金缴存比例最高 12%
+  evidence_category: compensation_fact
+  unit: "%"                  # 公司缴存比例：增加福利价值（含补充公积金）
+  required_level: optional
+  collection: initial_questions
+  metrics: [benefits]
+
+housing_fund_base:
+  value_type: money
+  evidence_category: compensation_fact
+  unit: CNY/month            # 缴存基数；缺省按 monthly_base 计算
+  required_level: optional
+  collection: initial_questions
+  metrics: [benefits, after_tax_monthly]
+
+monthly_necessary_expense:
+  value_type: money
+  evidence_category: personal_context
+  unit: CNY/month            # 该城市预估必要生活支出（房租/餐饮/通勤等），估值即可
+  required_level: normal
+  collection: initial_questions
+  metrics: [disposable_monthly, purchasing_power]
+
+housing_support:
+  value_type: enum
+  evidence_category: compensation_fact
+  options:
+    - {value: dorm, label: 有免费宿舍}
+    - {value: none, label: 不管}
+  default_value: none
+  required_level: optional
+  collection: initial_questions
+  metrics: [benefits, disposable_monthly]
+
+housing_support_value:
+  value_type: money
+  evidence_category: compensation_fact
+  unit: CNY/month
+  required_level: optional
+  collection: initial_questions
+  metrics: [benefits, disposable_monthly]
+
+# ─────────────────────────────────────────────
+# 3. 业务发展 · 工作内容与成长（第二轮 Q3–Q8）
+# ─────────────────────────────────────────────
+# Q3 主证据是自由文本描述 + 与 JD 的一致性；taxonomy 仅作分类标签，
+# 不直接驱动岗位价值密度（避免"开发 > 测试 > 交付"这类隐含价值判断）。
+work_content_type:
+  value_type: enum
+  evidence_category: work_experience
+  evidence_class: classification
+  options:                    # 仅用于分类与解释，不做"开发>测试>交付"式价值排序
+    - {value: tech_dev, label: 技术开发}
+    - {value: algo_research, label: 算法研究}
+    - {value: data_analysis, label: 数据分析}
+    - {value: qa_quality, label: 测试质量}
+    - {value: product_ops, label: 产品运营}
+    - {value: delivery, label: 实施交付}
+    - {value: biz_sales, label: 商务销售}
+    - {value: functional, label: 职能支持}
+    - {value: mixed, label: 混合}
+    - {value: other, label: 其他（补充说明）}
+  required_level: optional
+  collection: initial_questions
+  metrics: []
+
+actual_work_description:
+  value_type: text
+  evidence_category: work_experience
+  required_level: normal
+  collection: initial_questions
+  metrics: []                 # 定性描述：可供说明与检索展示
+
+jd_match_level:
+  value_type: enum
+  evidence_category: work_experience
+  options:
+    - {value: high_match, label: 高度契合}
+    - {value: basic_match, label: 基本契合}
+    - {value: partial_match, label: 部分契合}
+    - {value: notable_gap, label: 差异较大}
+    - {value: mismatch, label: 基本不契合}
+  required_level: normal
+  collection: initial_questions
+  metrics: [role_consistency]
+
+entry_scope:
+  value_type: enum
+  evidence_category: work_experience
+  options:                    # 5 档与 Ownership Rubric (20/40/60/80/100) 一一对应
+    - {value: marginal_tasks, label: 明确任务}
+    - {value: assist_tasks, label: 小功能}
+    - {value: small_feature, label: 独立模块}
+    - {value: own_module, label: 项目重要部分}
+    - {value: own_feature_end2end, label: 独立推动项目}
+  required_level: core
+  collection: initial_questions
+  metrics: [ownership]
+
+repetitive_work_level:
+  value_type: enum
+  evidence_category: work_experience
+  options:
+    - {value: rarely, label: 很少}
+    - {value: little, label: 较少}
+    - {value: normal, label: 一般}
+    - {value: much, label: 较多}
+    - {value: heavy, label: 很多}
+  required_level: normal
+  collection: initial_questions
+  metrics: [value_density]
+
+autonomy_level:
+  value_type: enum
+  evidence_category: work_experience
+  options:
+    - {value: process, label: 按流程执行}
+    - {value: occasional, label: 偶尔判断}
+    - {value: frequent, label: 经常自主决策}
+    - {value: high, label: 高度自主}
+  required_level: normal
+  collection: initial_questions
+  metrics: [value_density, growth_speed]
+
+problem_complexity_level:
+  value_type: enum            # 问题复杂度（problem_complexity）的核心证据，与 autonomy 分离
+  evidence_category: work_experience
+  options:
+    - {value: routine, label: 常规问题}
+    - {value: analytical, label: 有一定分析}
+    - {value: complex, label: 复杂问题}
+    - {value: open, label: 开放问题}
+    - {value: systemic, label: 高复杂系统问题}
+  required_level: normal
+  collection: initial_questions
+  metrics: [problem_complexity]
+
+mentorship:
+  value_type: enum
+  evidence_category: work_experience
+  options:
+    - {value: formal, label: 正式导师}
+    - {value: assigned, label: 明确带教人}
+    - {value: informal, label: 非正式帮助}
+    - {value: self_reliant, label: 基本靠自己}
+  required_level: normal
+  collection: initial_questions
+  metrics: [growth_speed]
+
+feedback_cadence:
+  value_type: enum
+  evidence_category: work_experience
+  options:
+    - {value: formal_regular, label: 定期正式反馈}
+    - {value: informal_often, label: 经常非正式反馈}
+    - {value: occasional, label: 偶尔}
+    - {value: rare, label: 很少}
+  required_level: normal
+  collection: initial_questions
+  metrics: [growth_speed]
+
+core_skill:
+  value_type: text             # 多选语义：多个技能用顿号分隔，可自由补充
+  evidence_category: work_experience
+  required_level: normal
+  collection: initial_questions
+  metrics: [skill_value]       # 解释性输入，Rubric 主要看下面两项
+
+skill_transferability:
+  value_type: enum
+  evidence_category: work_experience
+  options:
+    - {value: high, label: 通用性强（换公司/行业仍值钱）}
+    - {value: medium, label: 部分通用}
+    - {value: low, label: 强绑定当前公司/业务}
+  required_level: normal
+  collection: initial_questions
+  metrics: [skill_transfer, career_optionality]
+
+skill_market_demand:
+  value_type: enum
+  evidence_category: market_perception
+  evidence_class: perception  # 用户对市场需求的认知：低可靠度辅助信息，V2 由招聘市场数据补充
+  options:
+    - {value: very_high, label: 很高}
+    - {value: high, label: 较高}
+    - {value: medium, label: 一般}
+    - {value: low, label: 较低}
+    - {value: very_low, label: 很低}
+  required_level: normal
+  collection: initial_questions
+  metrics: [skill_value, career_optionality]
+
+# ─────────────────────────────────────────────
+# 4. 业务发展 · 业务与组织状态（第二轮 Q9–Q11）
+# ─────────────────────────────────────────────
+strategic_position:
+  value_type: enum
+  evidence_category: business_strategy
+  options:
+    - {value: core_main, label: 核心主营}
+    - {value: strategic_invest, label: 战略投入}
+    - {value: important_established, label: 重要成熟}
+    - {value: normal, label: 普通}
+    - {value: supporting, label: 支持型}
+    - {value: edge, label: 边缘}
+    - {value: shrinking, label: 收缩}
+  required_level: normal
+  collection: initial_questions
+  metrics: [business_strategic_position]
+
+business_trend_status:
+  value_type: enum
+  evidence_category: business_strategy
+  options:
+    - {value: fast_growth, label: 快速增长}
+    - {value: steady_growth, label: 稳定增长}
+    - {value: stable, label: 稳定}
+    - {value: shrinking_signs, label: 收缩迹象}
+    - {value: shrinking, label: 明显收缩}
+  required_level: normal
+  collection: initial_questions
+  metrics: [business_trend, business_stability]
+
+team_headcount_trend:
+  value_type: enum
+  evidence_category: team_status
+  options:
+    - {value: expanding_fast, label: 明显扩招}
+    - {value: expanding_some, label: 小幅扩招}
+    - {value: stable, label: 稳定}
+    - {value: shrinking_some, label: 小幅缩编}
+    - {value: shrinking_fast, label: 明显缩编}
+  required_level: normal
+  collection: initial_questions
+  metrics: [org_stability, business_trend]
+
+layoff_level:
+  value_type: enum            # 裁员程度：正常影响稳定性评分，不直接触发 Critical
+  evidence_category: team_status
+  options:
+    - {value: none, label: 无明显情况}
+    - {value: minor, label: 少量调整}
+    - {value: significant, label: 明显裁员}
+    - {value: large_scale, label: 大规模裁撤}
+  required_level: normal
+  collection: initial_questions
+  metrics: [org_stability, company_stability]
+
+team_dissolution_risk:
+  value_type: enum            # 与"裁员程度"分离：warning 触发 high team_dissolution
+  evidence_category: team_status
+  options:
+    - {value: none, label: 无}
+    - {value: warning, label: 有解散/撤城预警}
+  required_level: optional
+  collection: dynamic
+  metrics: []
+
+performance_pressure:
+  value_type: enum
+  evidence_category: team_status
+  options:                    # "不了解"用问题层"不知道"作答表达，不作为字段取值
+    - {value: none, label: 无明显淘汰}
+    - {value: low_ratio, label: 低比例淘汰}
+    - {value: stack_rank, label: 明确末位淘汰}
+    - {value: high_pressure, label: 高淘汰压力}
+  required_level: normal
+  collection: initial_questions
+  metrics: [org_stability, role_continuity]
+
+# ─────────────────────────────────────────────
+# 5. 工作强度（第一轮）与身心健康（第二轮）
+# ─────────────────────────────────────────────
+official_hours_policy:
+  value_type: enum
+  evidence_category: contractual_fact
+  options:
+    - {value: fixed, label: 固定工时}
+    - {value: flexible, label: 弹性}
+    - {value: shift, label: 轮班}
+    - {value: other, label: 其他（补充说明）}
+  required_level: normal
+  collection: initial_questions
+  metrics: [workload, time_predictability]
+
+weekly_work_hours:
+  value_type: number
+  min: 1
+  max: 168                   # 物理上限（7×24）；超过即录入错误
+  evidence_category: work_experience
+  unit: h/week
+  required_level: core
+  collection: initial_questions
+  metrics: [workload, time_occupation, effective_hourly]
+
+weekend_pattern:
+  value_type: enum
+  evidence_category: work_experience
+  options:
+    - {value: double_off, label: 稳定双休}
+    - {value: big_small_week, label: 大小周}
+    - {value: single_off, label: 单休}
+    - {value: irregular, label: 不固定}
+  required_level: normal
+  collection: initial_questions
+  metrics: [rest_assurance, workload]
+
+oncall_cadence:
+  value_type: enum
+  evidence_category: work_experience
+  options:
+    - {value: none, label: 无}
+    - {value: monthly_few, label: 每月少量}
+    - {value: weekly, label: 每周}
+    - {value: frequent, label: 高频}
+  required_level: normal
+  collection: initial_questions
+  metrics: [time_occupation, time_predictability]
+
+overtime_night:
+  value_type: enum
+  evidence_category: work_experience
+  options:
+    - {value: rare, label: 很少}
+    - {value: occasional, label: 偶尔}
+    - {value: monthly_several, label: 每月数次}
+    - {value: weekly_several, label: 每周数次}
+    - {value: frequent, label: 高频}
+  required_level: normal
+  collection: initial_questions
+  metrics: [workload, time_occupation]
+
+commute_minutes:
+  value_type: number
+  min: 0
+  max: 240                   # 单程 4 小时已无通勤意义，超过即录入错误
+  evidence_category: work_experience
+  unit: min/single trip
+  required_level: normal
+  collection: initial_questions
+  metrics: [time_occupation, effective_hourly, disposable_monthly]
+
+travel_frequency:
+  value_type: enum
+  evidence_category: work_experience
+  options:
+    - {value: none, label: 无}
+    - {value: monthly_le1, label: ≤1 天/月}
+    - {value: monthly_2_4, label: 2–4 天/月}
+    - {value: monthly_5_8, label: 5–8 天/月}
+    - {value: monthly_gt8, label: ">8 天/月"}
+  required_level: normal
+  collection: initial_questions
+  metrics: [time_occupation, time_predictability]
+
+remote_policy:
+  value_type: enum
+  evidence_category: contractual_fact   # 正式制度信息暂挂此类；字段增多后再拆 policy_fact
+  options:
+    - {value: none_support, label: 不支持}
+    - {value: occasional, label: 偶尔可远程}
+    - {value: hybrid_fixed, label: 固定混合办公}
+    - {value: mostly_remote, label: 基本远程}
+  required_level: optional
+  collection: initial_questions
+  metrics: [time_occupation, rest_assurance]
+
+# ─────────────────────────────────────────────
+# 6. 平台维度补充：来自用户认知（q10）或后续版本联网
+# ─────────────────────────────────────────────
+company_competitiveness:
+  value_type: enum
+  evidence_category: market_perception
+  options:
+    - {value: leader, label: 行业头部}
+    - {value: strong, label: 较强}
+    - {value: average, label: 一般}
+    - {value: weak, label: 偏弱}
+  required_level: optional
+  collection: initial_questions
+  metrics: [company_competitiveness]
+
+industry_outlook:
+  value_type: enum
+  evidence_category: market_perception
+  options:
+    - {value: high, label: 向好}
+    - {value: medium, label: 平稳}
+    - {value: low, label: 下行}
+  required_level: optional
+  collection: initial_questions
+  metrics: [industry_outlook]
+
+# ─────────────────────────────────────────────
+# 7. Offer 信息收集页新版字段（六个分区）
+# ─────────────────────────────────────────────
+city_affinity:
+  value_type: number
+  min: 1
+  max: 5
+  evidence_category: personal_context
+  unit: score/5
+  default_value: 3
+  required_level: optional
+  collection: initial_questions
+  metrics: []
+
+distance_from_home:
+  value_type: enum
+  evidence_category: personal_context
+  options:
+    - {value: hometown, label: 就在家乡}
+    - {value: same_province, label: 在家乡省内}
+    - {value: neighboring_province, label: 在周边省份}
+    - {value: far_away, label: 离家很远}
+  default_value: same_province
+  required_level: optional
+  collection: initial_questions
+  metrics: []
+
+employment_nature:
+  value_type: enum
+  evidence_category: contractual_fact
+  options:
+    - {value: civil_service, label: 公务员}
+    - {value: public_institution, label: 事业编}
+    - {value: state_owned, label: 国央企}
+    - {value: foreign_company, label: 外企}
+    - {value: major_company, label: 知名大厂}
+    - {value: small_company, label: 小私企}
+    - {value: freelance, label: 自由职业}
+  required_level: optional
+  collection: initial_questions
+  metrics: []
+
+is_outsourced:
+  value_type: boolean
+  evidence_category: contractual_fact
+  default_value: false
+  required_level: optional
+  collection: initial_questions
+  metrics: []
+
+annual_bonus_method:
+  value_type: enum
+  evidence_category: compensation_fact
+  options:
+    - {value: amount, label: 金额}
+    - {value: multiple, label: 倍数}
+  default_value: amount
+  required_level: optional
+  collection: initial_questions
+  metrics: [expected_cash, income_certainty]
+
+annual_bonus_value:
+  value_type: number
+  min: 0
+  evidence_category: compensation_fact
+  unit: CNY or months
+  required_level: optional
+  collection: initial_questions
+  metrics: [expected_cash, income_certainty]
+
+social_security_type:
+  value_type: enum
+  evidence_category: compensation_fact
+  options:
+    - {value: none, label: 不缴纳}
+    - {value: salary, label: 按工资}
+    - {value: minimum, label: 按城市最低基数}
+    - {value: custom, label: 自定义基数}
+  default_value: salary
+  required_level: optional
+  collection: initial_questions
+  metrics: [after_tax_monthly, disposable_monthly]
+
+social_security_base:
+  value_type: money
+  min: 0
+  evidence_category: compensation_fact
+  unit: CNY/month
+  required_level: optional
+  collection: initial_questions
+  metrics: [after_tax_monthly, disposable_monthly]
+
+housing_fund_base_type:
+  value_type: enum
+  evidence_category: compensation_fact
+  options:
+    - {value: none, label: 不缴纳}
+    - {value: salary, label: 按工资}
+    - {value: minimum, label: 按城市最低基数}
+    - {value: custom, label: 自定义基数}
+  default_value: salary
+  required_level: optional
+  collection: initial_questions
+  metrics: [after_tax_monthly, disposable_monthly, benefits]
+
+special_additional_deductions:
+  value_type: multi_enum
+  evidence_category: personal_context
+  options:
+    - {value: children_education, label: 子女2k}
+    - {value: continuing_education, label: 继续教育}
+    - {value: mortgage_interest, label: 房贷1k}
+    # 住房租金分三档（1500/1100/800，按城市见 city_index rent_deduction_monthly），
+    # label 不标金额以免误导非 1500 档城市
+    - {value: rent, label: 住房租金}
+    - {value: elderly_support, label: 养老3k}
+    - {value: infant_care, label: 婴幼儿2k}
+  default_value: []
+  required_level: optional
+  collection: initial_questions
+  metrics: []
+
+# 不再收集：入职现金按一次性收入展示，常规年度收入不设补贴期限；保留定义以校验旧草稿
+signing_bonus_payment_year:
+  value_type: number
+  min: 1
+  max: 10
+  evidence_category: compensation_fact
+  unit: year
+  ui_group: signing_bonus_bundle
+  ui_role: payment_year
+  default_value: 1
+  required_level: optional
+  collection: initial_questions
+  metrics: []
+
+subsidy_duration_years:
+  value_type: number
+  min: 0
+  max: 50
+  evidence_category: compensation_fact
+  unit: years
+  ui_group: subsidy_bundle
+  ui_role: duration
+  default_value: 30
+  required_level: optional
+  collection: initial_questions
+  metrics: []
+
+meal_plan:
+  value_type: enum
+  evidence_category: compensation_fact
+  options:
+    - {value: three_meals, label: 免费三餐}
+    - {value: two_meals, label: 免费两餐}
+    - {value: one_meal, label: 免费一餐}
+    - {value: no_meals, label: 不管}
+  default_value: no_meals
+  required_level: optional
+  collection: initial_questions
+  metrics: []
+
+work_start_time:
+  value_type: text
+  evidence_category: contractual_fact
+  unit: HH:MM
+  default_value: "09:00"
+  required_level: optional
+  collection: initial_questions
+  metrics: [workload, time_occupation]
+
+work_end_time:
+  value_type: text
+  evidence_category: contractual_fact
+  unit: HH:MM
+  default_value: "18:00"
+  required_level: optional
+  collection: initial_questions
+  metrics: [workload, time_occupation]
+
+daily_idle_hours:
+  value_type: number
+  min: 0
+  max: 24
+  evidence_category: work_experience
+  unit: h/day
+  default_value: 1
+  required_level: optional
+  collection: initial_questions
+  metrics: [workload, time_occupation]
+
+commute_hours:
+  value_type: number
+  min: 0
+  max: 24
+  evidence_category: work_experience
+  unit: h/single trip
+  default_value: 0.5
+  required_level: optional
+  collection: initial_questions
+  metrics: [time_occupation, effective_hourly, disposable_monthly]
+
+work_days_per_week:
+  value_type: number
+  min: 1
+  max: 7
+  evidence_category: work_experience
+  unit: days/week
+  required_level: core
+  collection: initial_questions
+  metrics: [workload, rest_assurance]
+
+travel_days_per_month:
+  value_type: number
+  min: 0
+  max: 31
+  evidence_category: work_experience
+  unit: days/month
+  default_value: 0
+  required_level: optional
+  collection: initial_questions
+  metrics: [time_occupation, time_predictability]
+
+work_environment:
+  value_type: enum
+  evidence_category: work_experience
+  options:
+    - {value: cbd, label: CBD}
+    - {value: office, label: 普通写字楼}
+    - {value: factory, label: 工厂}
+    - {value: construction_site, label: 工地}
+    - {value: remote_area, label: 偏远地区}
+  required_level: optional
+  collection: initial_questions
+  metrics: []
+
+# 三维报告的扩展项。金额统一为人民币；可选增益未填按零处理，
+# 负担及同题评价只有全体填写后才影响排名。
+probation_months:
+  value_type: number
+  min: 0
+  max: 12
+  evidence_category: contractual_fact
+  unit: months
+  required_level: optional
+  collection: initial_questions
+  metrics: [probation_score]
+probation_pay_percent:
+  value_type: percent
+  min: 0
+  max: 100
+  evidence_category: contractual_fact
+  unit: "%"
+  required_level: optional
+  collection: initial_questions
+  metrics: [probation_score]
+annual_raise_percent:
+  value_type: percent
+  min: 0
+  max: 100
+  evidence_category: compensation_fact
+  unit: "%"
+  required_level: optional
+  collection: initial_questions
+  metrics: [cash_score]
+relocation_grant:
+  value_type: money
+  min: 0
+  evidence_category: compensation_fact
+  unit: CNY
+  required_level: optional
+  collection: initial_questions
+  metrics: [entry_income]
+supplementary_medical_value:
+  value_type: money
+  min: 0
+  evidence_category: compensation_fact
+  unit: CNY/year
+  required_level: optional
+  collection: initial_questions
+  metrics: [benefits]
+overtime_comp_annual:
+  value_type: money
+  min: 0
+  evidence_category: compensation_fact
+  unit: CNY/year
+  required_level: optional
+  collection: initial_questions
+  metrics: [annual_cash]
+training_days_year:
+  value_type: number
+  min: 0
+  max: 365
+  evidence_category: work_experience
+  unit: days/year
+  required_level: optional
+  collection: initial_questions
+  metrics: [learning_support]
+training_budget_year:
+  value_type: money
+  min: 0
+  evidence_category: compensation_fact
+  unit: CNY/year
+  required_level: optional
+  collection: initial_questions
+  metrics: [learning_support]
+internal_mobility:
+  value_type: enum
+  evidence_category: work_experience
+  options: [{value: available, label: 有内部轮岗或转岗}, {value: none, label: 没有}]
+  required_level: optional
+  collection: initial_questions
+  metrics: [career_optionality]
+portfolio_permission:
+  value_type: enum
+  evidence_category: work_experience
+  options: [{value: public, label: 可公开成果}, {value: anonymized, label: 可匿名展示}, {value: none, label: 不可展示}]
+  required_level: optional
+  collection: initial_questions
+  metrics: [career_optionality]
+ai_tool_access:
+  value_type: enum
+  evidence_category: work_experience
+  options: [{value: supported, label: 提供工具和使用空间}, {value: allowed, label: 可自行使用}, {value: none, label: 不支持}]
+  required_level: optional
+  collection: initial_questions
+  metrics: [learning_support]
+user_impact_exposure:
+  value_type: enum
+  evidence_category: work_experience
+  options: [{value: direct, label: 能直接看到用户或业务结果}, {value: indirect, label: 偶尔接触结果}, {value: none, label: 很难接触}]
+  required_level: optional
+  collection: initial_questions
+  metrics: [growth_opportunity]
+goal_skill_fit:
+  value_type: enum
+  evidence_category: personal_context
+  options: [{value: high, label: 很契合}, {value: medium, label: 部分契合}, {value: low, label: 不太契合}]
+  required_level: optional
+  collection: initial_questions
+  metrics: [personal_fit]
+project_stage:
+  value_type: enum
+  evidence_category: business_strategy
+  options: [{value: early, label: 从零到一}, {value: scaling, label: 增长期}, {value: mature, label: 成熟期}, {value: declining, label: 收缩期}]
+  required_level: optional
+  collection: initial_questions
+  metrics: [project_context]
+peak_week_hours:
+  value_type: number
+  min: 0
+  max: 168
+  evidence_category: work_experience
+  unit: h/week
+  required_level: optional
+  collection: initial_questions
+  metrics: [annual_occupied_hours]
+peak_weeks_year:
+  value_type: number
+  min: 0
+  max: 52
+  evidence_category: work_experience
+  unit: weeks/year
+  required_level: optional
+  collection: initial_questions
+  metrics: [annual_occupied_hours]
+after_hours_response:
+  value_type: enum
+  evidence_category: work_experience
+  options: [{value: none, label: 基本不用}, {value: occasional, label: 偶尔}, {value: weekly, label: 每周}, {value: daily, label: 几乎每天}]
+  required_level: optional
+  collection: initial_questions
+  metrics: [time_predictability]
+remote_days_week:
+  value_type: number
+  min: 0
+  max: 7
+  evidence_category: contractual_fact
+  unit: days/week
+  required_level: optional
+  collection: initial_questions
+  metrics: [annual_occupied_hours]
+flex_schedule:
+  value_type: enum
+  evidence_category: contractual_fact
+  options: [{value: "yes", label: 可弹性安排}, {value: "no", label: 固定时间}]
+  required_level: optional
+  collection: initial_questions
+  metrics: [time_control]
+extra_paid_leave:
+  value_type: number
+  min: 0
+  max: 365
+  evidence_category: contractual_fact
+  unit: days/year
+  required_level: optional
+  collection: initial_questions
+  metrics: [annual_free_time]
+meeting_load:
+  value_type: enum
+  evidence_category: work_experience
+  options: [{value: light, label: 较少}, {value: moderate, label: 一般}, {value: heavy, label: 很多}]
+  required_level: optional
+  collection: initial_questions
+  metrics: [focus_time]
+manager_support:
+  value_type: enum
+  evidence_category: work_experience
+  options: [{value: high, label: 愿意支持和授权}, {value: medium, label: 一般}, {value: low, label: 较少支持}]
+  required_level: optional
+  collection: initial_questions
+  metrics: [team_experience]
+team_speakup:
+  value_type: enum
+  evidence_category: work_experience
+  options: [{value: open, label: 能坦诚提意见}, {value: mixed, label: 视情况}, {value: closed, label: 很难表达}]
+  required_level: optional
+  collection: initial_questions
+  metrics: [team_experience]
+work_meaning:
+  value_type: enum
+  evidence_category: personal_context
+  options: [{value: high, label: 很有认同感}, {value: medium, label: 一般}, {value: low, label: 不太认同}]
+  required_level: optional
+  collection: initial_questions
+  metrics: [personal_fit]
+side_project_policy:
+  value_type: enum
+  evidence_category: contractual_fact
+  options: [{value: allowed, label: 允许个人项目}, {value: restricted, label: 需审批或有限制}, {value: prohibited, label: 不允许}]
+  required_level: optional
+  collection: initial_questions
+  metrics: [life_autonomy]
+weekend_overtime_days_month:
+  value_type: number
+  min: 0
+  max: 31
+  evidence_category: work_experience
+  unit: days/month
+  required_level: optional
+  collection: initial_questions
+  metrics: [rest_assurance]
+workspace_comfort:
+  value_type: enum
+  evidence_category: work_experience
+  options: [{value: good, label: 舒适}, {value: average, label: 一般}, {value: poor, label: 不舒适}]
+  required_level: optional
+  collection: initial_questions
+  metrics: [work_experience]
+
+business_level:
+  value_type: enum
+  evidence_category: business_strategy
+  options:
+    - {value: core, label: 核心业务}
+    - {value: important, label: 重要业务}
+    - {value: normal, label: 普通业务}
+    - {value: support, label: 支持业务}
+    - {value: edge, label: 边缘业务}
+  required_level: core
+  collection: initial_questions
+  metrics: [business_strategic_position]
+
+business_growth_expectation:
+  value_type: enum
+  evidence_category: business_strategy
+  options:
+    - {value: fast_growth, label: 高速增长}
+    - {value: steady_growth, label: 平稳增长}
+    - {value: no_growth, label: 不增长}
+    - {value: declining, label: 下降}
+    - {value: unclear, label: 不清楚}
+  default_value: steady_growth
+  required_level: optional
+  collection: initial_questions
+  metrics: [business_trend, business_stability]
+
+business_affinity:
+  value_type: number
+  min: 1
+  max: 5
+  evidence_category: personal_context
+  unit: score/5
+  default_value: 3
+  required_level: optional
+  collection: initial_questions
+  metrics: []
+
+boss_resource_ability:
+  value_type: enum
+  evidence_category: work_experience
+  options:
+    - {value: high, label: 高}
+    - {value: medium, label: 中}
+    - {value: low, label: 低}
+    - {value: unclear, label: 不清楚}
+  default_value: unclear
+  required_level: optional
+  collection: initial_questions
+  metrics: []
+
+boss_ability:
+  value_type: enum
+  evidence_category: work_experience
+  options:
+    - {value: high, label: 高}
+    - {value: medium, label: 中}
+    - {value: low, label: 低}
+    - {value: unclear, label: 不清楚}
+  default_value: unclear
+  required_level: optional
+  collection: initial_questions
+  metrics: []
+
+entrepreneurial:
+  value_type: enum
+  evidence_category: business_strategy
+  options:
+    - {value: "yes", label: 是}
+    - {value: "no", label: 不是}
+  default_value: "no"
+  required_level: optional
+  collection: initial_questions
+  metrics: []
+
+bossless:
+  value_type: boolean
+  evidence_category: work_experience
+  default_value: false
+  required_level: optional
+  collection: initial_questions
+  metrics: []
+
+boss_attitude:
+  value_type: enum
+  evidence_category: work_experience
+  options:
+    - {value: good, label: 好}
+    - {value: average, label: 中}
+    - {value: poor, label: 差}
+    - {value: pua, label: PUA}
+    - {value: unclear, label: 不清楚}
+  default_value: unclear
+  required_level: optional
+  collection: initial_questions
+  metrics: []
+
+kpi_pressure:
+  value_type: enum
+  evidence_category: work_experience
+  options:
+    - {value: high, label: 高}
+    - {value: medium, label: 中}
+    - {value: low, label: 低}
+    - {value: no_kpi, label: 没有kpi}
+    - {value: unclear, label: 不清楚}
+  default_value: no_kpi
+  required_level: optional
+  collection: initial_questions
+  metrics: []
+
+speaking_hours_per_day:
+  value_type: number
+  min: 0
+  max: 24
+  evidence_category: work_experience
+  unit: h/day
+  default_value: 0
+  required_level: optional
+  collection: initial_questions
+  metrics: []
+
+communication_style:
+  value_type: enum
+  evidence_category: work_experience
+  options:
+    - {value: conversational, label: 畅聊}
+    - {value: blame_shifting, label: 甩锅}
+    - {value: conflict, label: 吵架}
+    - {value: flattering, label: 奉承}
+    - {value: unclear, label: 不清楚}
+  default_value: conversational
+  required_level: optional
+  collection: initial_questions
+  metrics: []
+
+expected_mental_state:
+  value_type: enum
+  evidence_category: personal_context
+  options:
+    - {value: happy, label: 快乐}
+    - {value: relaxed, label: 放松}
+    - {value: calm, label: 平静}
+    - {value: tense, label: 紧绷}
+    - {value: numb, label: 内耗}
+    - {value: painful, label: 痛苦}
+    - {value: depressed, label: 抑郁}
+    - {value: unclear, label: 不清楚}
+  default_value: calm
+  required_level: optional
+  collection: initial_questions
+  metrics: []

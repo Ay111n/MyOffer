@@ -1,0 +1,41 @@
+# 行尾规范：仓库内一律存 LF，检出到工作区也用 LF。
+# 本文件优先级高于 core.autocrlf，因此无需改动本地 git 配置，
+# 在 Windows 上也不会再出现「LF will be replaced by CRLF」的刷屏警告。
+
+* text=auto eol=lf
+
+# 显式声明为二进制：禁止任何行尾 / 编码转换，避免误判为文本损坏内容
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.woff  binary
+*.woff2 binary
+*.ttf  binary
+*.otf  binary
+*.zip  binary
+*.pdf  binary
+*.mp4  binary
+
+# Windows 专用脚本保留 CRLF，避免 cmd / PowerShell 解析异常
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# 部署脚本在 Linux 侧执行，强制 LF（否则 shebang 失效）
+deploy/*.sh  text eol=lf
+deploy/*.py  text eol=lf
+deploy/*.sql text eol=lf
+
+# 便于 diff 展示与语言统计
+*.py   text diff=python
+*.md   text
+*.yaml text
+*.yml  text
+*.json text
+*.ts   text
+*.tsx  text
+*.css  text
+*.html text

@@ -1,0 +1,160 @@
+# results_A1.yaml — 城市数据扩充批次 A1（12 城）
+# 采集日期: 2026-10-04；口径遵循 EXPANSION_GUIDE.md（city_index.yaml v0.6）
+# 房价口径: 全市二手住宅，fangjia.com/creprice.cn 为挂牌价，一律 ×0.92 修正为成交价并在 housing_source 注明
+# 生活成本: 指引先验档（经验推断）为主，厦门按租金证据微调
+
+苏州:
+  hf_bounds: {min: 4952, max: 40600}
+  hf_as_of: "2026-07"
+  hf_source: "苏州市政府网 suzhou.gov.cn《苏州市2026年度住房公积金缴存基数调整》(2026-07-20，经WebSearch摘要): 上限40600元；下限口径为'本市社保最低缴费基数'，江苏2026年度社保最低缴费基数4952元(省级种子口径)，故取4952。推断: 下限数值为据官方口径表述+江苏2026社保基数推定，非直接数字引用"
+  housing_price_per_sqm: 22250
+  housing_month: "2026-09"
+  housing_source: "房天下研究院 苏州二手房挂牌均价 24185元/㎡(2026-09第2周，经WebSearch摘要 m.fang.com)；挂牌×0.92=22250。注意: 房天下'苏州'为市区口径(含园区，不含昆山/常熟/太仓/张家港)，大市口径均价会明显更低"
+  living_baseline_cost_month: 3350
+  living_basis: "经验推断: 指引新一线档 苏州 3200-3500 取中值；合租单间约2100-2200 + 伙食交通1200"
+  rate_override: null
+  rate_note: "继承江苏省级口径"
+  rank_note: "2025 榜单第 9 位，新一线"
+
+青岛:
+  hf_bounds: {min: 2400, max: 34342.75}
+  hf_as_of: "2026-07"
+  hf_source: "青岛市住房公积金管理中心2026年度调整通知(2026-07-06，经m12333.cn/QQ新闻 WebSearch摘要): 上限34342.75元，下限提高至七区2400元、三市2210元；2025年度值为33093/七区2200/三市2010(https://qingdao.dzwww.com 2025-07-17)"
+  housing_price_per_sqm: 10710
+  housing_month: "2026-10"
+  housing_source: "https://qd.fangjia.com/zoushi 青岛二手房挂牌均价 11640元/㎡(2026-10当月周度)；挂牌×0.92=10710。注意: 房天下市区样本挂牌约16800元/㎡(2026-09，经WebSearch摘要)，口径差异大，全市口径(含即墨/胶州/平度/莱西)取房价网值"
+  living_baseline_cost_month: 3050
+  living_basis: "经验推断: 指引新一线档 青岛 2900-3200 取中值；合租单间约1900 + 伙食交通1150"
+  rate_override: null
+  rate_note: "继承山东省级口径；指引提示青岛医保或存在市级差异，未检索到官方数值，留待复核"
+  rank_note: "2025 榜单第 16 位，新一线"
+
+东莞:
+  hf_bounds: {min: 2300, max: 27700}
+  hf_as_of: "2026-07"
+  hf_source: "https://m.dg.bendibao.com 东莞本地宝《2026年东莞住房公积金缴存基数上限下限调整通知》(2026-08-26，经WebSearch摘要): 2026年度上限27700元；下限2026-09-01起按2300元执行(存量职工过渡期按2080元)。注意未套用广州41697口径"
+  housing_price_per_sqm: 17390
+  housing_month: "2026-09"
+  housing_source: "https://www.creprice.cn/rank/cityforsale.html 中国房价行情网 2026-09 全国城市住宅挂牌排行: 东莞 18904元/㎡(挂牌)；挂牌×0.92=17390"
+  living_baseline_cost_month: 2750
+  living_basis: "经验推断: 指引新一线档 东莞/佛山 2600-2900 取中值；合租单间约1550-1650 + 伙食交通1150"
+  rate_override: null
+  rate_note: "继承广东省级口径"
+  rank_note: "2025 榜单第 17 位，新一线"
+
+宁波:
+  hf_bounds: {min: 2490, max: 38907}
+  hf_as_of: "2026-07"
+  hf_source: "宁波市住房公积金中心2026年度基数调整通知(2026-06-18，经新浪财经 finance.sina.com.cn WebSearch摘要): 2026年度上限暂按2025年度38907元执行，待新标准公布后另行调整；下限按2025年度宁波市最低工资(市区2490元)"
+  housing_price_per_sqm: 12620
+  housing_month: "2026-10"
+  housing_source: "https://nb.fangjia.com/zoushi 宁波二手房挂牌均价 13717元/㎡(2026-10当月周度)；挂牌×0.92=12620。佐证: 安居客宁波区县挂牌 鄞州19752/奉化9154(经WebSearch摘要)"
+  living_baseline_cost_month: 3150
+  living_basis: "经验推断: 指引新一线档 宁波 3000-3300 取中值；合租单间约1950-2000 + 伙食交通1150"
+  rate_override: null
+  rate_note: "继承浙江省级口径；指引提示宁波医保或存在市级差异，未检索到官方数值，留待复核"
+  rank_note: "2025 榜单第 18 位，新一线"
+
+佛山:
+  hf_bounds: {min: 2300, max: 31395}
+  hf_as_of: "2026-07"
+  hf_source: "https://m.fs.bendibao.com 佛山本地宝(2026-09-04，经WebSearch摘要): 2026年度(2026.7-2027.6)上限31395元，下限2026-09-01起2300元(2026-07-01初期为2080元)。注意: 任务提示'佛山2025上限约27234'为2024年度旧值，2025年度实为28959元，勿沿用"
+  housing_price_per_sqm: 8350
+  housing_month: "2026-10"
+  housing_source: "https://fs.fangjia.com/zoushi 佛山二手房挂牌均价 9083元/㎡(2026-10当月周度)；挂牌×0.92=8356。异常提示: 低于新一线sanity带(12000-35000)下限，系全市口径(含三水/高明低值区)+2026行情下行，市区(禅城/南海/顺德)约11000-13000，主智能体可复核"
+  living_baseline_cost_month: 2750
+  living_basis: "经验推断: 指引新一线档 东莞/佛山 2600-2900 取中值；合租单间约1550-1650 + 伙食交通1150"
+  rate_override: null
+  rate_note: "继承广东省级口径"
+  rank_note: "2025 榜单第 19 位，新一线"
+
+无锡:
+  hf_bounds: {min: 2660, max: 36800}
+  hf_as_of: "2026-07"
+  hf_source: "税屋 shui5.cn 转载无锡市公积金中心2026年度缴存基数调整通知(经WebSearch摘要): 最高限额36800元，最低按最低工资标准执行。推断: 下限取2660元，依据江苏一类地区最低工资2026-01由2490调整为2660(经WebSearch摘要，南京2026公积金下限2660同口径印证)"
+  housing_price_per_sqm: 9420
+  housing_month: "2026-10"
+  housing_source: "https://wx.fangjia.com/zoushi 无锡二手房挂牌均价 10241元/㎡(2026-10当月周度)；挂牌×0.92=9422。注意: 若含江阴/宜兴的大市口径与市区口径存在差异，主智能体可复核"
+  living_baseline_cost_month: 2800
+  living_basis: "经验推断: 指引二线沿海强市档 2600-3300 取中低档(无锡租金低于苏/甬)；合租单间约1600 + 伙食交通1200"
+  rate_override: null
+  rate_note: "继承江苏省级口径"
+  rank_note: "2025 榜单第 21 位，二线"
+
+厦门:
+  hf_bounds: {min: 2265, max: 32937}
+  hf_as_of: "2026-07"
+  hf_source: "厦门市住房公积金中心2026年度(2026.7.1-2027.6.30)调整通知(2026-06-29，经腾讯新闻 view.inews.qq.com/新浪 WebSearch摘要): 缴存基数上限32937元、下限2265元；月缴存额上限7904元、下限226元"
+  housing_price_per_sqm: 28480
+  housing_month: "2026-10"
+  housing_source: "https://xm.fangjia.com/zoushi 厦门二手房挂牌均价 30955元/㎡(2026-10当月周度)；挂牌×0.92=28479。互证: 中国房价行情网 2026-09 厦门 30499元/㎡(https://www.creprice.cn/rank/cityforsale.html)"
+  living_baseline_cost_month: 2600
+  living_basis: "租金锚点: 2026厦门合租单间 岛内约1000-2000元、岛外(集美/海沧/同安)约600-1200元，取约1400 + 伙食交通1200；指引先验档为3000-3300，据2026租金行情(中指50城厦门<40元/㎡/月，与南京相近，经WebSearch摘要)下调至2600"
+  rate_override: null
+  rate_note: "继承福建省级口径"
+  rank_note: "2025 榜单第 25 位，二线"
+
+温州:
+  hf_bounds: {min: 2490, max: 31665}
+  hf_as_of: "2025-07"
+  hf_source: "https://www.163.com 温州2025年度公积金缴存基数(2025-07-16，经WebSearch摘要): 上限31665元，下限按各县(市、区)最低工资(鹿城/龙湾/瓯海/洞头等2490元)。2026年度调整已于2026-07-18执行(新浪财经2026-07-19)，但新数值未检索到，保守沿用2025年度值；推断: 2026年下限或随浙江最低工资调至2660元、上限约33000+，待主智能体复核"
+  housing_price_per_sqm: 9350
+  housing_month: "2026-10"
+  housing_source: "https://wz.fangjia.com/zoushi 温州二手房挂牌均价 10164元/㎡(2026-10当月周度)；挂牌×0.92=9351。注意: 全市口径含乐清/瑞安/苍南/文成等低值县市"
+  living_baseline_cost_month: 3100
+  living_basis: "经验推断: 指引二线沿海强市档，温州/厦门取高档 3000-3300 取3100；合租单间约1900 + 伙食交通1200"
+  rate_override: null
+  rate_note: "继承浙江省级口径"
+  rank_note: "2025 榜单第 26 位，二线"
+
+大连:
+  hf_bounds: {min: 2230, max: 31929}
+  hf_as_of: "2026-07"
+  hf_source: "大连市住房公积金中心官网通知《关于做好2026年缴存基数调整工作的通知》https://gjj.dl.gov.cn/art/2026/7/10/art_5549_2522926.html (已抓取原文): 2026-2027年度(2026.7.1起)上限31929元，下限按大连市2025年月最低工资标准；下限2230元另据辽宁日报2026-07-10及大连1renshi(2025-12-01最低工资上调后公积金下限同步至2230)。注意: 检索中另见24609/29949两个旧口径值，以官网原文31929为准"
+  housing_price_per_sqm: 8730
+  housing_month: "2026-10"
+  housing_source: "https://dl.fangjia.com/zoushi 大连二手房挂牌均价 9486元/㎡(2026-10当月周度)；挂牌×0.92=8727。注意: 全市口径含旅顺/金州/普湾等低值区域"
+  living_baseline_cost_month: 2900
+  living_basis: "经验推断: 指引二线沿海强市档 2600-3300 取中值；合租单间约1700-1750 + 伙食交通1150"
+  rate_override: null
+  rate_note: "继承辽宁省级口径；指引提示大连医保或存在市级差异，未检索到官方数值，留待复核"
+  rank_note: "2025 榜单第 28 位，二线"
+
+金华:
+  hf_bounds: {min: 2430, max: 31911}
+  hf_as_of: "2026-07"
+  hf_source: "义乌市住房公积金管理中心2026年度缴存基数调整通知(2026-04，经WebSearch摘要，义乌按金华市口径): 2026年度上限31911元(金华市2025年非私营月平均工资×3)，下限2430元(最低工资)；2025年度为31398/2260(https://zc.51shebao.com)。注意: 金华市区通知原文未直接检索到，上限以义乌按金华市口径的数值代入"
+  housing_price_per_sqm: 11710
+  housing_month: "2026-10"
+  housing_source: "https://jinhua.fangjia.com/zoushi 金华二手房挂牌均价 12728元/㎡(2026-10当月周度)；挂牌×0.92=11710。注意: 全市口径含义乌(较高)与兰溪/浦江/磐安(较低)"
+  living_baseline_cost_month: 2800
+  living_basis: "经验推断: 指引二线沿海强市档 2600-3300 取中低档；合租单间约1600(义乌略高、其余县市略低) + 伙食交通1200"
+  rate_override: null
+  rate_note: "继承浙江省级口径"
+  rank_note: "2025 榜单第 30 位，二线"
+
+泉州:
+  hf_bounds: {min: 2195, max: 24795}
+  hf_as_of: "2026-07"
+  hf_source: "泉州市住房公积金管委会《关于公布2026年住房公积金缴存…的通知》https://qzgjj.quanzhou.gov.cn/zwgk/zfxxgk/fdzdgknr/zcfggfxwj/202607/t20260706_3306842.htm (已抓取原文，执行2026.7.1-2027.6.30): 上限24795元(99180÷12×3)；下限分两档——市直/鲤城/丰泽/洛江/泉港/石狮/晋江/南安/惠安2195元，安溪/永春/德化2045元(最低工资口径)，取主城区档2195"
+  housing_price_per_sqm: 8630
+  housing_month: "2026-10"
+  housing_source: "https://quanzhou.fangjia.com/zoushi 泉州二手房挂牌均价 9376元/㎡(2026-10当月周度)；挂牌×0.92=8626"
+  living_baseline_cost_month: 2400
+  living_basis: "经验推断: 指引二线档 泉州 2300-2500 取中值；合租单间约1250 + 伙食交通1150"
+  rate_override: null
+  rate_note: "继承福建省级口径"
+  rank_note: "2025 榜单第 31 位，二线"
+
+常州:
+  hf_bounds: {min: 2490, max: 33800}
+  hf_as_of: "2025-07"
+  hf_source: "https://www.12333si.com 常州2025年度公积金缴存基数(2025-07-03，执行2025.7.1-2026.6.30): 上限33800元、下限2490元。2026年度调整通知未检索到(按惯例应于2026年6-7月公布)，沿用2025年度值，主智能体需复核"
+  housing_price_per_sqm: 8730
+  housing_month: "2026-10"
+  housing_source: "https://changzhou.fangjia.com/zoushi 常州二手房挂牌均价 9486元/㎡(2026-10当月周度)；挂牌×0.92=8727。注意: 全市口径含金坛/溧阳低值区"
+  living_baseline_cost_month: 2700
+  living_basis: "经验推断: 指引二线沿海强市档 2600-3300 取低档；合租单间约1500 + 伙食交通1200"
+  rate_override: null
+  rate_note: "继承江苏省级口径"
+  rank_note: "2025 榜单第 34 位，二线"

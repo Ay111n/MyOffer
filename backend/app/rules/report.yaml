@@ -1,0 +1,245 @@
+# v5 三维比较规则；税费、城市和薪资档位沿用现有参考数据。
+# 分数档内线性插值；可直接视作零的增益项允许单方有值。
+
+meta: {report_version: "5"}
+
+# 维度键与问卷保持一致。
+decision_dimensions:
+  economic: {label: 经济回报, modules: [salary, housing, living]}
+  growth: {label: 职业成长, modules: [development]}
+  experience: {label: 工作体验, modules: [health]}
+
+# 保留的历史模块权重仅供旧校验与明细工具读取；排名采用下方 v5 权重。
+money_module_weights: {salary: 0.45, housing: 0.10, living: 0.45}
+
+three_dimension_scoring:
+  economic:
+    # 现金按绝对税后金额评分；购买力只记城市成本造成的档位变化，避免重复计入现金。
+    usual_weights: {cash: 0.50, entry: 0.10, probation: 0.05, purchasing: 0.25, benefits: 0.10}
+    buyer_weights: {cash: 0.45, entry: 0.10, probation: 0.05, purchasing: 0.20, benefits: 0.10, housing: 0.10}
+    entry_bands: [{amount: 0, score: 0}, {amount: 10000, score: 25}, {amount: 30000, score: 50}, {amount: 60000, score: 75}, {amount: 100000, score: 100}]
+    benefits_bands: [{ratio: 0, score: 20}, {ratio: 0.05, score: 45}, {ratio: 0.10, score: 70}, {ratio: 0.20, score: 90}]
+  growth:
+    category_weights: {opportunity: 0.35, responsibility: 0.35, skills: 0.15, cultivation: 0.10, options: 0.05}
+    business_level: {core: 100, important: 80, normal: 60, support: 40, edge: 20}
+    entry_scope: {marginal_tasks: 20, assist_tasks: 40, small_feature: 60, own_module: 80, own_feature_end2end: 100}
+    mentorship: {formal: 100, assigned: 80, informal: 50, self_reliant: 20}
+    feedback_cadence: {formal_regular: 100, informal_often: 80, occasional: 50, rare: 20}
+    extended_maps:
+      jd_match_level: {high_match: 100, basic_match: 80, partial_match: 55, notable_gap: 30, mismatch: 10}
+      autonomy_level: {process: 20, occasional: 45, frequent: 75, high: 100}
+      problem_complexity_level: {routine: 25, analytical: 50, complex: 75, open: 90, systemic: 100}
+      skill_transferability: {high: 100, medium: 65, low: 25}
+      internal_mobility: {available: 100, none: 0}
+      portfolio_permission: {public: 100, anonymized: 60, none: 0}
+      ai_tool_access: {supported: 100, allowed: 60, none: 0}
+      user_impact_exposure: {direct: 100, indirect: 55, none: 0}
+      goal_skill_fit: {high: 100, medium: 55, low: 15}
+    zero_default: [internal_mobility, portfolio_permission, ai_tool_access, user_impact_exposure]
+  experience:
+    category_weights: {time: 0.45, rest: 0.15, boundary: 0.25, daily: 0.15}
+    occupied_hours_bands: [{hours: 40, score: 95}, {hours: 45, score: 85}, {hours: 50, score: 75}, {hours: 55, score: 60}, {hours: 60, score: 45}, {hours: 70, score: 25}, {hours: 80, score: 5}]
+    extra_workday_penalty: 10
+    travel_day_penalty: 2
+    travel_penalty_cap: 15
+    extended_maps:
+      oncall_cadence: {none: 100, monthly_few: 75, weekly: 45, frequent: 15}
+      after_hours_response: {none: 100, occasional: 75, weekly: 45, daily: 10}
+      flex_schedule: {yes: 100, no: 0}
+      meeting_load: {light: 100, moderate: 60, heavy: 20}
+      manager_support: {high: 100, medium: 60, low: 20}
+      team_speakup: {open: 100, mixed: 60, closed: 20}
+      work_meaning: {high: 100, medium: 60, low: 20}
+      side_project_policy: {allowed: 100, restricted: 50, prohibited: 0}
+      workspace_comfort: {good: 100, average: 60, poor: 20}
+      performance_pressure: {none: 100, low_ratio: 75, stack_rank: 35, high_pressure: 10}
+    zero_default: [flex_schedule, side_project_policy]
+
+# ── 个税（年度累计预扣法 + 年终奖单独计税）────────────────────────
+# 2026-10 联网核对：税率表/速算数（2019 年版个税法）与起征点 5000 均现行有效；
+# 年终奖单独计税依据财政部 税务总局公告 2023 年第 30 号，有效期至 2027-12-31，
+# 到期前（2027 下半年）需复核是否再延续。
+# 时效项集中登记在 policy_expiries（启动时由 validate.policy_expiry_warnings 检查，
+# 避免在注释里埋日期、过期无人知晓）；每项：basis=文号依据、expires_on=失效日、
+# review_after=进入提前复核窗口的起始日、impact=失效后不更新的后果。
+policy_expiries:
+  annual_bonus_separate_tax:
+    basis: "财政部 税务总局公告 2023 年第 30 号"
+    expires_on: "2027-12-31"
+    review_after: "2027-06-30"
+    impact: "年终奖单独计税优惠失效后须改为并入综合所得；未更新将高估到手现金"
+tax:
+  standard_deduction_monthly: 5000
+  cumulative_brackets:        # 全年应纳税所得额累计 → 速算
+    - {upper: 36000, rate: 0.03, quick: 0}
+    - {upper: 144000, rate: 0.10, quick: 2520}
+    - {upper: 300000, rate: 0.20, quick: 16920}
+    - {upper: 420000, rate: 0.25, quick: 31920}
+    - {upper: 660000, rate: 0.30, quick: 52920}
+    - {upper: 960000, rate: 0.35, quick: 85920}
+    - {upper: null, rate: 0.45, quick: 181920}
+  bonus_monthly_brackets:     # 一次性收入单独计税：本笔全额 × 档税率 − 月度速算扣除（以本笔÷12 查档定档）
+    - {upper: 3000, rate: 0.03, quick: 0}
+    - {upper: 12000, rate: 0.10, quick: 210}
+    - {upper: 25000, rate: 0.20, quick: 1410}
+    - {upper: 35000, rate: 0.25, quick: 2660}
+    - {upper: 55000, rate: 0.30, quick: 4410}
+    - {upper: 80000, rate: 0.35, quick: 7160}
+    - {upper: null, rate: 0.45, quick: 15160}
+
+# 专项附加扣除 → 月扣除额（fields.yaml special_additional_deductions 的取值）。
+# 2026-10 核对：2023 年 8 月国务院上调后的标准仍有效。住房租金按国发〔2018〕41号
+# 分三档（直辖市/省会/计划单列市 1500；市辖区户籍人口超 100 万 1100；其余 800），
+# v0.6 起 universe 已含普通地级市——每城档值见 city_index.yaml 的
+# rent_deduction_monthly（引擎 report.py 消费）；此处 rent 仅作城市缺档时的兜底
+# （取直辖市/省会档），启动校验保证 universe 内城市不依赖兜底。
+special_deduction_monthly:
+  children_education: 2000
+  continuing_education: 400
+  mortgage_interest: 1000
+  rent: 1500
+  elderly_support: 3000
+  infant_care: 2000
+
+# ── 福利折现（年福利补贴 = 补贴 + 餐食 + 宿舍，按月折算，不计税）─────
+# 折现口径 = 员工省下的市场替代成本。2026-10 校准：外卖正餐客单约 30 元、
+# 连锁快餐 15-25 元（2025），单餐折现 500-700 元/月区间成立，三档维持；
+# 宿舍折现 1500 介于一线床位价（800-2000）与合租单间（一线 2500+）之间，维持。
+welfare:
+  meal_monthly: {three_meals: 1500, two_meals: 1000, one_meal: 500, no_meals: 0}
+  dorm_monthly: 1500
+
+# ── 买房攒首付（常规年度税后现金中的参考储蓄率；月供/房价走 city_index）──
+# 2026-10 校准：全国居民储蓄率约 32%（国家统计局 2025 年度），青年「能存下一半
+# 月薪」约占 39%（2025 存钱报告，样本偏一二线）；有明确攒首付目标会上浮，
+# 取 0.45 作为「有目标的一二线毕业生」可持续口径（0.5 偏乐观上限）。
+housing:
+  down_payment_saving_rate: 0.45
+
+# ── 模块 5 生活水平（2026-10 重定义，竞品对齐口径）────────────────
+# 三条数值不再依赖手估生活成本线，全部改用可溯源锚点：
+#   当地平均工资 = 社保缴费基数上限 ÷ 3（全口径社平的 300% 缴费口径，
+#                  随年度基数更新自动跟进，见 CITY_DATA_SOURCES.md）；
+#   当地物价系数 = 城市单人基本生活成本估算 ÷ national_baseline_cost_month
+#                  （全国平均 = 1.0，一线 1.4+ / 二线 0.7-1.0）。
+# 城市未填或不在 universe 时按全国平均口径兜底：工资 8,000、物价系数 1.0。
+living:
+  national_avg_wage_month: 8000       # 全国平均工资（元/月，全口径社平量级）
+  national_baseline_cost_month: 3000  # 全国单人基本生活成本基准（物价系数锚点，
+                                      # ≈2025 城镇居民人均月消费支出量级）
+  comfort_wage_multiple: 1.5          # 舒适线 = 当地平均工资 × 物价系数 × 1.5
+
+# ── 模块分档（0-100；min 为下限即进入该档）────────────────────────
+salary_score_bands:          # v5 对固定年度税后现金插值（元/年）
+  - {min: 600000, score: 95}
+  - {min: 450000, score: 85}
+  - {min: 350000, score: 75}
+  - {min: 280000, score: 65}
+  - {min: 220000, score: 55}
+  - {min: 160000, score: 45}
+  - {min: 120000, score: 35}
+  - {min: 0, score: 25}
+insurance_score_ratio_bands: # 按 (个人+单位)月缴 / 月薪
+  - {min: 0.60, score: 90}
+  - {min: 0.50, score: 80}
+  - {min: 0.40, score: 70}
+  - {min: 0.30, score: 55}
+  - {min: 0.20, score: 45}
+  - {min: 0.10, score: 30}
+  - {min: 0.0, score: 20}
+hourly_score_bands:          # 按全去年化时薪（元/h）
+  - {min: 120, score: 90}
+  - {min: 90, score: 80}
+  - {min: 70, score: 70}
+  - {min: 55, score: 60}
+  - {min: 40, score: 45}
+  - {min: 25, score: 30}
+  - {min: 0, score: 20}
+housing_payment_ratio_bands: # 按月供收入比（≤ max 进入该档；档内插值，超末档取末档分）
+  - {max: 0.20, score: 90}
+  - {max: 0.30, score: 80}
+  - {max: 0.40, score: 70}
+  - {max: 0.50, score: 55}
+  - {max: 0.65, score: 40}
+  - {max: 2.0, score: 25}
+housing_tenure_adjust:       # 按攒首付年限对分数加减（插值；> 35 年取 -20）
+  - {max_years: 5, score: 10}
+  - {max_years: 8, score: 5}
+  - {max_years: 15, score: 0}
+  - {max_years: 25, score: -10}
+  - {max_years: 35, score: -20}
+living_multiple_bands:       # v5 对城市购买力 ÷ 全国月薪基准 8000 插值
+  - {min: 2.0, score: 95}
+  - {min: 1.6, score: 85}
+  - {min: 1.3, score: 72}
+  - {min: 1.1, score: 62}
+  - {min: 1.0, score: 55}
+  - {min: 0.8, score: 40}
+  - {min: 0, score: 25}
+
+# ── 模块等级（score ≥ min 进入该档）────────────────────────────
+grades:
+  salary:      [{min: 85, label: 很高}, {min: 70, label: 较高}, {min: 55, label: 中等}, {min: 0, label: 有空间}]
+  insurance:   [{min: 80, label: 充足}, {min: 65, label: 较足}, {min: 45, label: 中等}, {min: 0, label: 待加强}]
+  efficiency:  [{min: 80, label: 高效}, {min: 65, label: 尚可}, {min: 45, label: 中等}, {min: 0, label: 待提升}]
+  housing:     [{min: 75, label: 轻松}, {min: 55, label: 尚可}, {min: 40, label: 有压力}, {min: 0, label: 需规划}]
+  living:      [{min: 85, label: 宽裕}, {min: 70, label: 够花}, {min: 55, label: 有压力}, {min: 0, label: 需节流}]
+  development: [{min: 85, label: 潜力大}, {min: 70, label: 较好}, {min: 55, label: 中等}, {min: 0, label: 待观察}]
+  stability:   [{min: 80, label: 很稳}, {min: 65, label: 较稳}, {min: 50, label: 中等}, {min: 0, label: 有变数}]
+
+# ── 模块 6 发展水平：八轴雷达 ────────────────────────────────────
+development:
+  # 城市等级轴固定取 city_index 每城的 tier_score（0-100），字段名不可配置；
+  # city_axis 仅声明展示 label（引擎 report.py _development_module）。
+  city_axis: {label: 城市等级}
+  axes:                        # 枚举字段轴（映射必须覆盖字段全部选项）
+    - {field: business_level, label: 业务水平}
+    - {field: business_growth_expectation, label: 业务增长预期}
+    - {field: business_affinity, label: 业务经营度, numeric: {min: 1, max: 5}}
+    - {field: boss_resource_ability, label: 老板资源能力}
+    - {field: boss_ability, label: 老板能力}
+    - {field: boss_attitude, label: 老板态度}
+    - {field: communication_style, label: 沟通氛围}
+  maps:
+    business_level: {core: 100, important: 80, normal: 60, support: 40, edge: 20}
+    business_growth_expectation: {fast_growth: 100, steady_growth: 75, no_growth: 45, declining: 20, unclear: 50}
+    boss_resource_ability: {high: 100, medium: 65, low: 30, unclear: 50}
+    boss_ability: {high: 100, medium: 65, low: 30, unclear: 50}
+    boss_attitude: {good: 100, average: 70, poor: 35, pua: 10, unclear: 50}
+    communication_style: {conversational: 100, flattering: 55, blame_shifting: 30, conflict: 20, unclear: 50}
+
+# ── 模块 7 稳定性：组件分加权 − 外包折减 ─────────────────────────
+# 只放「制度/节奏」类事实。管饭/管住已按月折现进薪资模块福利（钱），
+# 在此重复计分会三重惩罚高福利公司，故不再作为稳定性组件。
+stability:
+  outsourced_penalty: 25
+  components:
+    - {key: work_days, label: 周工作天数, weight: 0.50, field: work_days_per_week, bands: [{max: 4.5, score: 90}, {max: 5, score: 80}, {max: 5.5, score: 65}, {max: 6, score: 50}, {max: 7, score: 30}]}
+    - {key: kpi, label: KPI压力, weight: 0.50, field: kpi_pressure}
+  maps:
+    kpi_pressure: {no_kpi: 100, low: 90, medium: 65, high: 35, unclear: 50}
+
+# ── 模块 8 健康损耗：扣分制（分数越低越好）──────────────────────
+# 只放「消耗」类事实。KPI 压力/周工作天数的制度面归稳定性模块，
+# 此处不再重复扣分。未作答的映射项按 missing_score 中性扣分（填了不吃亏）；
+# 数值型来源（工时/通勤）缺失时模块整体待补充——不把缺失当健康。
+health:
+  grade_bands:                 # 按损耗分（cost）分档：max 越小越健康
+    - {max: 20, label: 损耗低}
+    - {max: 40, label: 损耗中}
+    - {max: 60, label: 需留意}
+    - {max: null, label: 需调整}
+  deductions:
+    # 工时档锚点：法定标准 40h、法定上限 44h，全国企业就业人员周平均工时 48.6h
+    # （国家统计局 2025 年度）——40h 起步扣分、50h（超全国均值）加重，档位校准维持。
+    - {key: hours, label: 工时, source: weekly_work_hours, bands: [{max: 40, score: 0}, {max: 45, score: 8}, {max: 50, score: 15}, {max: 55, score: 25}, {max: 60, score: 35}, {max: 80, score: 45}]}
+    - {key: weekend, label: 周末, source: weekend_pattern, missing_score: 8}
+    # 通勤档锚点：45 个主要城市单程平均 35min、超大城市 39min、北京 47min，
+    # 60min 为官方「极端通勤」线（《2024 年度中国主要城市通勤监测报告》）。
+    - {key: commute, label: 通勤, source: commute_minutes, fallback: {source: commute_hours, scale: 60}, bands: [{max: 30, score: 0}, {max: 45, score: 5}, {max: 60, score: 10}, {max: 90, score: 18}, {max: 180, score: 25}]}
+    - {key: travel, label: 出差, source: travel_frequency, missing_score: 8}
+    - {key: mental, label: 精神状态, source: expected_mental_state, missing_score: 10}
+  maps:
+    weekend_pattern: {double_off: 0, big_small_week: 8, single_off: 15, irregular: 12}
+    travel_frequency: {none: 0, monthly_le1: 3, monthly_2_4: 8, monthly_5_8: 15, monthly_gt8: 25}
+    expected_mental_state: {happy: 0, relaxed: 2, calm: 5, tense: 15, numb: 25, painful: 35, depressed: 45, unclear: 10}

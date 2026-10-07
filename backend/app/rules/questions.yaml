@@ -1,0 +1,57 @@
+meta:
+  catalog_version: "5"
+  description: 两步填写
+  areas:
+    essentials: {label: 七项基本信息, round: 1, description: ""}
+    details: {label: 更多信息, round: 1, description: ""}
+  area_order: [essentials, details]
+  question_order: [q_essentials, q_details, q_growth_details, q_experience_details]
+
+questions:
+  q_essentials:
+    section: essentials
+    comparison_mode: per_offer
+    answer_type: composite
+    prompt: 七项基本信息
+    outputs: [city, monthly_base, guaranteed_salary_months, business_level,
+              entry_scope, weekly_work_hours, work_days_per_week]
+    answerability: high
+    recommended_sources: [offer_letter, hr]
+  q_details:
+    section: details
+    comparison_mode: per_offer
+    answer_type: composite
+    prompt: 更多信息
+    outputs: [annual_bonus_method, annual_bonus_value, annual_bonus_months,
+              signing_bonus, government_talent_subsidy, monthly_subsidies, meal_plan, housing_support,
+              social_security_type, social_security_base, housing_fund_base_type,
+              housing_fund_employee_rate, housing_fund_employer_rate, housing_fund_base,
+              special_additional_deductions, mentorship, feedback_cadence,
+              commute_minutes, travel_days_per_month,
+              probation_months, probation_pay_percent, annual_raise_percent,
+              relocation_grant, supplementary_medical_value, overtime_comp_annual]
+    answerability: medium
+    recommended_sources: [offer_letter, hr, self_experience]
+  q_growth_details:
+    section: details
+    comparison_mode: per_offer
+    answer_type: composite
+    prompt: 职业成长补充
+    outputs: [jd_match_level, autonomy_level, problem_complexity_level,
+              skill_transferability, training_days_year, training_budget_year,
+              internal_mobility, portfolio_permission, ai_tool_access,
+              user_impact_exposure, goal_skill_fit, project_stage]
+    answerability: medium
+    recommended_sources: [offer_letter, hr, self_experience]
+  q_experience_details:
+    section: details
+    comparison_mode: per_offer
+    answer_type: composite
+    prompt: 工作体验补充
+    outputs: [peak_week_hours, peak_weeks_year, oncall_cadence,
+              after_hours_response, remote_days_week, flex_schedule,
+              extra_paid_leave, meeting_load, manager_support,
+              team_speakup, work_meaning, side_project_policy,
+              weekend_overtime_days_month, workspace_comfort, performance_pressure]
+    answerability: medium
+    recommended_sources: [offer_letter, hr, self_experience]
