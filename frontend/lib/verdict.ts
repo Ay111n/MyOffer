@@ -167,21 +167,25 @@ export function stabilityCopy(
   if (sensitivity.status === "tie") {
     return { level: "tie", title: "目前并列", body: "两份 Offer 按你的偏好综合分一样，谁领先完全取决于你更看重哪一项。" };
   }
+  // margin：全向扫描（含两维同动）得到的到翻转边界最短距离
+  const plane = sensitivity.margin != null
+    ? `在权重平面上无论朝哪个方向调，至少要把约 ${Math.max(1, Math.round(sensitivity.margin * 100))} 个百分点从一个维度挪到另一个维度，第一名才会变。`
+    : null;
   if (sensitivity.status === "stable" || !near) {
     return {
       level: "stable",
       title: "很稳",
-      body: `不管你把哪一项看得多重（${min}–${max}），${leader} 都还是第一。偏好的微调不会改变结论。`,
+      body: `无论把权重怎么组合（每个维度 ${min}–${max}，包括两个维度同时调整），${leader} 都保持第一。这个结论跟偏好无关。`,
     };
   }
   const result = near.ties ? `会和 ${name(near.overtaken_by)} 并列` : `第一名就会换成 ${name(near.overtaken_by)}`;
   if (sensitivity.status === "fragile") {
-    return { level: "fragile", title: "不太稳", body: `只要${flipAction(near)}，${result}。这个排名跟你怎么权衡强相关，建议认真想想你到底更看重什么。` };
+    return { level: "fragile", title: "不太稳", body: `只要${flipAction(near)}，${result}。这个排名跟你怎么权衡强相关，建议认真想想你到底更看重什么。${plane ?? ""}` };
   }
   if (sensitivity.status === "moderate") {
-    return { level: "moderate", title: "有一定弹性", body: `如果${flipAction(near)}，${result}。你的偏好需要有明显变化，结论才会反过来。` };
+    return { level: "moderate", title: "有一定弹性", body: `如果${flipAction(near)}，${result}。你的偏好需要有明显变化，结论才会反过来。${plane ?? ""}` };
   }
-  return { level: "steady", title: "比较稳", body: `要${flipAction(near)}，${result}。这需要你的看法和现在相差很远，结论比较可靠。` };
+  return { level: "steady", title: "比较稳", body: `要${flipAction(near)}，${result}。这需要你的看法和现在相差很远，结论比较可靠。${plane ?? ""}` };
 }
 
 /** 该用户可读的「信息」条目，严重度分三档。 */
@@ -253,17 +257,6 @@ export function buildNotices(offers: OfferReportView[], verdict: Verdict): Notic
       title: "有几项还没纳入比较",
       body: `${partialFields.map(fieldLabel).join("、")}只有部分 Offer 填了，所以暂时不影响排名。每份都补上后才会计入。`,
     });
-  }
-
-  for (const offer of offers) {
-    const extra = [...(offer.quality?.missing_fields ?? []), ...(offer.quality?.uncertain_fields ?? [])];
-    if (extra.length) {
-      notices.push({
-        level: "note",
-        title: `${nameOf(offer)} 有待确认的信息`,
-        body: `${[...new Set(extra)].slice(0, 6).map(fieldLabel).join("、")}还不确定，确认后结论会更可靠。`,
-      });
-    }
   }
   return notices;
 }

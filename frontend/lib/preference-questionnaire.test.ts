@@ -1,7 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import type { PreferenceQuestion, PreferenceQuestionnaireResource } from "@/lib/api/types";
 import {
+  clearQuestionnaireDraft,
   normalizeManualWeights,
+  preferenceQuestionnaireDraftKey,
+  readUnsavedQuestionnaireAnswers,
   rebalanceWeightPercentages,
   roundWeightsToPercentages,
   scorePreferenceAnswers,
@@ -86,5 +89,53 @@ describe("preference questionnaire scoring", () => {
       .toEqual({ economic: "50", growth: "25", experience: "25" });
     expect(rebalanceWeightPercentages({ economic: "50", growth: "25", experience: "25" }, "economic", "100"))
       .toEqual({ economic: "90", growth: "5", experience: "5" });
+  });
+});
+
+describe("readUnsavedQuestionnaireAnswers（已答完未保存 = 草稿齐全）", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  const fullDraft = (version: string) => JSON.stringify({
+    version,
+    currentIndex: 3,
+    answers: [
+      { question_id: "pair-0", choice: "left_strong" },
+      { question_id: "pair-1", choice: "equal" },
+      { question_id: "pair-2", choice: "right_slight" },
+      { question_id: "buy_house_intent", choice: "consider" },
+    ],
+  });
+
+  it("草稿四题齐全时按题目顺序返回作答（生成入口据此提醒）", () => {
+    sessionStorage.setItem(preferenceQuestionnaireDraftKey("s1"), fullDraft("v2"));
+    expect(readUnsavedQuestionnaireAnswers("s1", definition)).toEqual([
+      { question_id: "pair-0", choice: "left_strong" },
+      { question_id: "pair-1", choice: "equal" },
+      { question_id: "pair-2", choice: "right_slight" },
+      { question_id: "buy_house_intent", choice: "consider" },
+    ]);
+  });
+
+  it("保存成功清掉草稿后返回 null（不重复提醒）", () => {
+    sessionStorage.setItem(preferenceQuestionnaireDraftKey("s1"), fullDraft("v2"));
+    clearQuestionnaireDraft("s1");
+    expect(readUnsavedQuestionnaireAnswers("s1", definition)).toBeNull();
+  });
+
+  it("版本不匹配（规则更新残留）、答不齐、坏 JSON 一律返回 null", () => {
+    sessionStorage.setItem(preferenceQuestionnaireDraftKey("s1"), fullDraft("v1"));
+    expect(readUnsavedQuestionnaireAnswers("s1", definition)).toBeNull();
+
+    sessionStorage.setItem(preferenceQuestionnaireDraftKey("s1"), JSON.stringify({
+      version: "v2",
+      answers: [{ question_id: "pair-0", choice: "left_strong" }],
+    }));
+    expect(readUnsavedQuestionnaireAnswers("s1", definition)).toBeNull();
+
+    sessionStorage.setItem(preferenceQuestionnaireDraftKey("s1"), "{not-json");
+    expect(readUnsavedQuestionnaireAnswers("s1", definition)).toBeNull();
+    expect(readUnsavedQuestionnaireAnswers("missing-session", definition)).toBeNull();
   });
 });

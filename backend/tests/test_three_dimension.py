@@ -1,3 +1,4 @@
+import json
 from uuid import uuid4
 
 import pytest
@@ -5,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.domain.contracts import DecisionInput, OfferInput, RawFactInput, UserPreferenceInput
 from app.domain.evaluator import evaluate
-from app.domain.report import _band_min, _clamp
+from app.domain.report import _band_max, _clamp
 from app.main import app
 from app.rules_runtime import get_rules
 from app.schemas import PreferenceAnswer
@@ -17,12 +18,12 @@ BASE = {"city": "北京", "monthly_base": 20000, "guaranteed_salary_months": 12,
         "weekly_work_hours": 50, "work_days_per_week": 5}
 
 
-def offer(order, **updates):
+def offer(order, company=None, position="", **updates):
     values = {**BASE, **updates}
     facts = {key: RawFactInput(field_key=key, value=value, status="known", source="offer_letter")
              for key, value in values.items() if value is not None}
-    return OfferInput(offer_id=uuid4(), company=f"Offer {order}", position="",
-                      display_order=order, facts=facts)
+    return OfferInput(offer_id=uuid4(), company=company if company is not None else f"Offer {order}",
+                      position=position, display_order=order, facts=facts)
 
 
 def result(*offers, intent="undecided", weights=None):
@@ -38,6 +39,15 @@ def test_complete_offers_rank_and_display_ties(count):
     assert all(row.overall_score is not None for row in rows)
     assert all(row.overall_rank == 1 for row in rows)
     assert all(set(row.dimension_scores) == {"economic", "growth", "experience"} for row in rows)
+
+
+def test_report_carries_input_identity_and_falls_back_to_slot_name():
+    # 报告透传输入身份（改名入口直写 company/position）；
+    # 空白名兜底为槽位默认命名，报告里永远有可读称呼
+    rows = result(offer(1, company="字节跳动", position="后端开发"),
+                  offer(2, company="   ")).offers
+    assert rows[0].company == "字节跳动" and rows[0].position == "后端开发"
+    assert rows[1].company == "Offer B" and rows[1].position == ""
 
 
 def test_missing_one_core_field_blocks_every_rank_but_keeps_partial_scores():
@@ -76,16 +86,22 @@ def test_city_buyer_weights_and_ranking_cash():
 
 
 def test_purchasing_subscore_only_credits_city_adjustment():
+    """购买力子分只由城市物价决定（与收入解耦）：按城市系数取固定分，
+    同城不同薪 → 子分完全相同（涨薪永不改变本子分），跨城差固定。"""
     rules = get_rules()
     first, second = result(offer(1), offer(2, city="成都")).offers
-    for row in (first, second):
-        recurring = row.sub_metrics["economic.recurring_net"]
-        adjusted = row.sub_metrics["economic.purchasing_monthly"]
-        bands = rules.report["living_multiple_bands"]
-        expected = _clamp(50 + _band_min(adjusted / 8000, bands)
-                          - _band_min(recurring / 12 / 8000, bands))
+    for row, city_name in ((first, "北京"), (second, "成都")):
+        cost = float(rules.data["city_index"]["cities"][city_name]["living"]["baseline_cost_month"])
+        national = float(rules.report["living"]["national_baseline_cost_month"])
+        expected = _clamp(_band_max(cost / national, rules.report["purchasing_city_bands"]))
         assert row.sub_scores["economic.purchasing"] == pytest.approx(expected)
+    # 全国平均城市恰为中性 50：ratio=1.0 处锚点
+    assert _band_max(1.0, rules.report["purchasing_city_bands"]) == pytest.approx(50)
     assert first.sub_scores["economic.purchasing"] != second.sub_scores["economic.purchasing"]
+    # 同城（北京）不同薪 → 购买力子分完全一致；展示口径的月购买力数值仍随收入变化
+    rich, poor = result(offer(1, monthly_base=35000), offer(2)).offers
+    assert rich.sub_scores["economic.purchasing"] == poor.sub_scores["economic.purchasing"]
+    assert rich.sub_metrics["economic.purchasing_monthly"] > poor.sub_metrics["economic.purchasing_monthly"]
 
 
 @pytest.mark.parametrize("overrides", [
@@ -217,6 +233,25 @@ def test_partial_commute_and_boundary_facts_do_not_create_scores():
     assert first.dimension_scores["experience"] == second.dimension_scores["experience"]
 
 
+def test_growth_without_own_inputs_is_not_scored():
+    """其他 offer 触发横向可比时，未填方按最低档兜底参与计算；但本 offer 若
+    连一个自有成长信息都没有（成长类核心字段也缺），纯兜底分不是它的
+    「已有分项」：维度分为 None、子分不落库。填了部分成长信息的混合情形
+    （如只填业务范围）仍有自有类目，维度分照常展示。"""
+    rows = result(offer(1, mentorship="formal", training_days_year=5),
+                  offer(2, business_level=None, entry_scope=None)).offers
+    assert rows[1].dimension_scores["growth"] is None
+    assert not [key for key in rows[1].sub_scores if key.startswith("growth.")]
+    assert rows[0].dimension_scores["growth"] is not None
+    assert "growth.cultivation" in rows[0].sub_scores
+
+    mixed = result(offer(1, mentorship="formal"),
+                   offer(2, entry_scope=None)).offers
+    assert mixed[1].dimension_scores["growth"] is not None
+    assert "growth.opportunity" in mixed[1].sub_scores
+    assert "growth.cultivation" in mixed[1].sub_scores
+
+
 def test_explicit_absence_does_not_activate_gain_categories():
     first, second = result(
         offer(1, internal_mobility="none", user_impact_exposure="none",
@@ -325,13 +360,18 @@ def test_export_incomplete_restore_and_old_rejection():
             ],
         })
         assert saved.status_code == 200, saved.text
+        # 改名后导出：身份名随归档携带，导入不丢
+        renamed = client.patch(f"/api/v1/sessions/{sid}/offers/{first['offer_id']}", json={
+            "version": saved.json()["data"]["version"], "company": "字节跳动", "position": "后端开发"})
+        assert renamed.status_code == 200, renamed.text
         exported = client.get(f"/api/v1/sessions/{sid}/report/export")
         assert exported.status_code == 200
         archive = exported.json()
         assert archive["format"] == "myoffer-input-v5"
         assert "outputs" not in archive
-        assert "company" not in archive["inputs"]["offers"][0]
-        assert "position" not in archive["inputs"]["offers"][0]
+        assert archive["inputs"]["offers"][0]["company"] == "字节跳动"
+        assert archive["inputs"]["offers"][0]["position"] == "后端开发"
+        assert archive["inputs"]["offers"][1]["company"] == "Offer B"
         assert archive["inputs"]["offers"][0]["facts"]["city"]["value"] == "北京"
         assert archive["inputs"]["offers"][0]["facts"]["training_budget_year"]["value"] == 5000
         assert client.post("/api/v1/sessions/restore", json={"format": "myoffer-report-v1"}).status_code == 422
@@ -340,6 +380,8 @@ def test_export_incomplete_restore_and_old_rejection():
         new_sid = restored.json()["data"]["session_id"]
         restored_offers = client.get(f"/api/v1/sessions/{new_sid}/offers")
         assert restored_offers.status_code == 200
+        assert restored_offers.json()["data"][0]["company"] == "字节跳动"
+        assert restored_offers.json()["data"][0]["position"] == "后端开发"
         assert restored_offers.json()["data"][0]["facts"]["city"]["value"] == "北京"
         assert restored_offers.json()["data"][0]["facts"]["remote_days_week"]["value"] == 2
         for item in restored_offers.json()["data"]:
@@ -353,6 +395,17 @@ def test_export_incomplete_restore_and_old_rejection():
         client.post(f"/api/v1/sessions/{new_sid}/questions/stop")
         assert len(client.get(f"/api/v1/sessions/{new_sid}/result").json()["data"]["ranking"]) == 2
         assert client.get(f"/api/v1/sessions/{new_sid}/report/export").status_code == 200
+        # 旧版归档（无身份名字段）仍可导入：空名兜底为槽位默认命名
+        legacy = json.loads(json.dumps(archive))
+        for item in legacy["inputs"]["offers"]:
+            item.pop("company")
+            item.pop("position")
+        restored_legacy = client.post("/api/v1/sessions/restore", json=legacy)
+        assert restored_legacy.status_code == 200, restored_legacy.text
+        legacy_sid = restored_legacy.json()["data"]["session_id"]
+        legacy_names = [o["company"] for o in
+                        client.get(f"/api/v1/sessions/{legacy_sid}/offers").json()["data"]]
+        assert legacy_names == ["Offer A", "Offer B"]
 
 
 def test_api_complete_report_uses_three_dimensions():

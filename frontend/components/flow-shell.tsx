@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Check } from "lucide-react";
+import { Check, Eraser } from "lucide-react";
 import { BrandLogo, BrandMark } from "./brand";
 import { ReportExport, ReportRestore } from "./report-tools";
 import { Button } from "./ui";
 import { usePreferences } from "@/lib/api/hooks";
 import { cn } from "@/lib/utils";
 import { requestComparisonScroll } from "@/lib/use-comparison-scroll";
-import { useFlowStore } from "@/stores/flow-store";
+import { clearLocalWorkspace, useFlowStore } from "@/stores/flow-store";
 
 type StepState = "done" | "current" | "todo";
 
@@ -67,6 +67,30 @@ function ComparisonSteps({ pathname, sessionId }: { pathname: string; sessionId:
   );
 }
 
+/** 清除本机数据：删除本地草稿与会话痕迹后从空白重开（服务端会话按 TTL 自然过期）。 */
+function ClearLocalData() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const clear = () => {
+    if (!window.confirm("确定清除本机保存的填写内容吗？清除后从空白重新开始，此操作不可恢复。")) return;
+    clearLocalWorkspace();
+    useFlowStore.getState().enterSession(null);
+    if (pathname === "/") window.location.reload();
+    else router.push("/");
+  };
+  return (
+    <button
+      type="button"
+      onClick={clear}
+      title="删除保存在本机的未提交草稿与会话痕迹"
+      className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-ink"
+    >
+      <Eraser aria-hidden="true" className="h-3.5 w-3.5" />
+      清除本机数据
+    </button>
+  );
+}
+
 export function FlowShell({ children }: { children: React.ReactNode }) {
   const sessionId = useFlowStore((state) => state.sessionId);
   const pathname = usePathname();
@@ -82,6 +106,7 @@ export function FlowShell({ children }: { children: React.ReactNode }) {
             <Link href="/settings/models" className="text-sm font-medium text-slate-600 hover:text-ink">模型配置</Link>
             <ReportRestore />
             <ReportExport sessionId={sessionId ?? ""} />
+            <ClearLocalData />
           </div>
         </div>
         {showSteps && <ComparisonSteps pathname={pathname} sessionId={sessionId} />}

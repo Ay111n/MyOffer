@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.domain.contracts import IncomeBreakdown, RawFactInput, ReportQuality, UserPreferenceInput
+from app.domain.contracts import IncomeBreakdown, RawFactInput, UserPreferenceInput
 
 
 class ErrorBody(BaseModel): code:str; message:str; details:dict[str,Any]=Field(default_factory=dict)
@@ -85,6 +85,10 @@ class FactPatch(BaseModel):
 class OfferPatchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     version:int
+    # 身份改名（选填）：company 提供 strip 后不得为空（标签与报告靠它做主标识）；
+    # position 传空串表示清除岗位。长度上限与 report_tools.validate_restore 一致。
+    company:str|None=Field(default=None, max_length=200)
+    position:str|None=Field(default=None, max_length=200)
     facts:list[FactPatch]=Field(default_factory=list, max_length=80)
 class OfferResetRequest(BaseModel): version:int=Field(ge=1)
 class OfferResource(BaseModel):
@@ -158,6 +162,20 @@ class AnswerItem(BaseModel):
 class AnswerRequest(BaseModel): answers:list[AnswerItem]=Field(max_length=8)
 class AnswerData(BaseModel): question_key:str; states:dict[str,str]
 class AnswerResponse(BaseModel): data:AnswerData; decision:DecisionEcho
+
+class BatchAnswerItem(BaseModel):
+    """单题草稿：answers 语义与单题端点完全一致（每 Offer 至多一条）。"""
+    question_key:str = Field(max_length=100)
+    answers:list[AnswerItem]=Field(max_length=8)
+class BatchAnswerRequest(BaseModel):
+    """多题草稿一次性提交（「生成对比报告」路径）：同一事务内逐题校验写入，
+    全部成功后只重算一次、只落一条快照。任一题校验失败整批拒绝（原子，
+    此时尚无任何写入），错误 details 附 question_key 供前端定位。"""
+    items:list[BatchAnswerItem]=Field(min_length=1, max_length=16)
+class BatchAnswerData(BaseModel):
+    # question_key → (offer_id|None 的字符串) → 聚合状态
+    questions:dict[str,dict[str,str]]=Field(default_factory=dict)
+class BatchAnswerResponse(BaseModel): data:BatchAnswerData; decision:DecisionEcho
 class StopData(BaseModel): phase:Literal['results']='results'
 class StopResponse(BaseModel):
     data:StopData; decision:DecisionEcho
@@ -202,11 +220,6 @@ class InsuranceModuleView(ModuleScoreView):
     employer_monthly:float|None=None
     total_monthly:float|None=None
 
-class EfficiencyModuleView(ModuleScoreView):
-    hourly:float|None=None
-    daily:float|None=None
-    idle_ratio:float|None=None
-
 class HousingModuleView(ModuleScoreView):
     down_payment:float|None=None
     down_payment_years:float|None=None
@@ -215,33 +228,13 @@ class HousingModuleView(ModuleScoreView):
     welfare_annual:float|None=None
     signing_bonus:float|None=None
 
-class LivingModuleView(ModuleScoreView):
-    income_multiple:float|None=None
-    purchasing_power:float|None=None
-    comfort_gap:float|None=None
-
-class DevelopmentModuleView(ModuleScoreView):
-    axes:dict[str,float]=Field(default_factory=dict)
-
-class StabilityModuleView(ModuleScoreView):
-    components:dict[str,Any]=Field(default_factory=dict)
-
-class HealthModuleView(ModuleScoreView):
-    cost:float|None=None
-    deductions:dict[str,float]=Field(default_factory=dict)
-    main_deduction:str|None=None
-    health_score:float|None=None
-
 class OfferReportView(BaseModel):
     offer_id:UUID; company:str; position:str; display_order:int
     city:str|None=None
-    employment_label:str|None=None
     monthly_after_tax:float|None=None
     overall_score:float|None=None
     overall_rank:int|None=None
-    money_score:float|None=None
     dimension_scores:dict[str,float|None]=Field(default_factory=dict)
-    quality:ReportQuality=Field(default_factory=ReportQuality)
     effective_weights:dict[str,float]=Field(default_factory=dict)
     score_contributions:dict[str,float]=Field(default_factory=dict)
     key_numbers:dict[str,float|None]=Field(default_factory=dict)
@@ -252,19 +245,10 @@ class OfferReportView(BaseModel):
     known_optional:dict[str,Any]=Field(default_factory=dict)
     input_values:dict[str,Any]=Field(default_factory=dict)
     city_data_as_of:str|None=None
-    completeness:int=0
-    missing_modules:list[str]=Field(default_factory=list)
-    city_pending:bool=False
     compliance_alert:bool=False
-    context_chips:list[str]=Field(default_factory=list)
     salary:SalaryModuleView
     insurance:InsuranceModuleView
-    efficiency:EfficiencyModuleView
     housing:HousingModuleView
-    living:LivingModuleView
-    development:DevelopmentModuleView
-    stability:StabilityModuleView
-    health:HealthModuleView
 
 class SensitivityFlip(BaseModel):
     """某个维度的权重调到 flip_weight 时，当前第一名不再是唯一第一。"""
@@ -274,12 +258,15 @@ class SensitivityFlip(BaseModel):
     ties:bool=False
 
 class SensitivityView(BaseModel):
-    """排名对偏好权重的敏感性。status：stable 调到极端也不变；steady 翻转点距当前 ≥ 20 个百分点；
-    moderate 10–20；fragile < 10；tie 当前就并列。"""
+    """排名对「偏好权重」的敏感性。status：stable 整个可选权重平面内都不变；
+    steady 距翻转边界 ≥ 20 个百分点；moderate 10–20；fragile < 10；tie 当前就并列。
+    margin 是当前权重到翻转边界的最短「总变差距离」——把多少个百分点从一个
+    维度挪到另一个维度（二维全向扫描，不限于单轴）；stable 时为 None。"""
     status:Literal["stable","steady","moderate","fragile","tie"]
     leader_id:UUID|None=None
     nearest:SensitivityFlip|None=None
     flips:list[SensitivityFlip]=Field(default_factory=list)
+    margin:float|None=None
     weight_min:float=0.05
     weight_max:float=0.9
 
@@ -326,16 +313,43 @@ class ReportScenarioRequest(BaseModel):
     model_config = ConfigDict(allow_inf_nan=False)
     snapshot_seq: int = Field(ge=1)
     offer_id: UUID
+    monthly_base: float | None = Field(default=None, gt=0, le=1_000_000)
     bonus_factor: float = Field(default=1, ge=0, le=2)
     weekly_work_hours: float | None = Field(default=None, gt=0, le=168)
     commute_minutes: float | None = Field(default=None, ge=0, le=240)
     weights: dict[str, float] | None = None
 
 
+class ReportScenarioSolveRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+    snapshot_seq: int = Field(ge=1)
+    offer_id: UUID
+
+
+class ParitySolution(BaseModel):
+    """反解追平点：目标 Offer 的某项输入谈到多少，展示综合分追平当前第一名。
+    required_value=None 表示在字段上界内仅靠该杠杆无法追平。"""
+    lever: Literal["monthly_base"] = "monthly_base"
+    target_id: UUID
+    leader_id: UUID
+    leader_score: float
+    target_current_score: float
+    current_value: float
+    required_value: float | None = None
+    delta: float | None = None
+
+
+class ScenarioSolveResponse(BaseModel): data: ParitySolution
+
+
 class PortableOfferInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     offer_id: UUID
     display_order: int
+    # 身份名随归档携带（改名入口的成果不因导出/导入丢失）；旧版归档没有
+    # 这两个键——缺省空名，导入时兜底为槽位默认命名（sessions.restore）
+    company: str = Field(default="", max_length=200)
+    position: str = Field(default="", max_length=200)
     facts: dict[str, RawFactInput] = Field(default_factory=dict)
 
 

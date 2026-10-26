@@ -1,7 +1,8 @@
-"""报告管线编排（v0.7）。
+"""报告管线编排（v5 三维评分）。
 
 evaluate() 是对外唯一入口：输入 DecisionInput，输出 ReportOutputs
-（八模块报告 + 综合评分排序）。纯函数，无递归；计算细节见 domain/report.py。
+（三维对比报告 + 综合评分排序）。纯函数，无递归；计算细节见
+domain/report_v5.py 与 domain/report.py。
 """
 from __future__ import annotations
 

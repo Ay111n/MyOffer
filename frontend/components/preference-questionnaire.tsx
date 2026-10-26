@@ -11,6 +11,7 @@ import type {
 import {
   PREFERENCE_DIMENSION_LABELS,
   PREFERENCE_DIMENSION_ORDER,
+  clearQuestionnaireDraft,
   normalizeManualWeights,
   rebalanceWeightPercentages,
   preferenceQuestionnaireDraftKey,
@@ -20,6 +21,9 @@ import {
 
 type Weights = Record<string, number>;
 type View = "intro" | "questions" | "result";
+
+/** definition 未就绪时的稳定空数组：避免每次渲染新建 [] 使 useMemo 依赖失效。 */
+const NO_QUESTIONS: PreferenceQuestion[] = [];
 
 const DIMENSION_COLORS: Record<string, { solid: string; soft: string; text: string }> = {
   economic: { solid: "#b98a3e", soft: "#f8f2e6", text: "#7a5520" },
@@ -151,19 +155,23 @@ export function PreferenceQuestionnaire({
   useEffect(() => {
     if (!definition || !draftReady || typeof window === "undefined") return;
     const key = preferenceQuestionnaireDraftKey(sessionId);
-    if (Object.keys(answers).length === 0) {
-      sessionStorage.removeItem(key);
-      return;
+    try {
+      if (Object.keys(answers).length === 0) {
+        sessionStorage.removeItem(key);
+        return;
+      }
+      const draft: Draft = {
+        version: definition.version,
+        answers: answerList(definition.questions ?? [], answers),
+        currentIndex,
+      };
+      sessionStorage.setItem(key, JSON.stringify(draft));
+    } catch {
+      // sessionStorage 不可用（隐私模式/配额满）：问卷照常作答，只是草稿不持久化
     }
-    const draft: Draft = {
-      version: definition.version,
-      answers: answerList(definition.questions ?? [], answers),
-      currentIndex,
-    };
-    sessionStorage.setItem(key, JSON.stringify(draft));
   }, [answers, currentIndex, definition, draftReady, sessionId]);
 
-  const questions = definition?.questions ?? [];
+  const questions = definition?.questions ?? NO_QUESTIONS;
   const selectedAnswers = useMemo(() => answerList(questions, answers), [answers, questions]);
   const completed = questions.length === 4 && questions.every((question) =>
     (question.options ?? []).some((option) => option.value === answers[question.question_id]));
@@ -175,9 +183,7 @@ export function PreferenceQuestionnaire({
   const currentQuestion = questions[currentIndex];
   const currentChoice = currentQuestion ? answers[currentQuestion.question_id] : undefined;
 
-  const clearDraft = () => {
-    if (typeof window !== "undefined") sessionStorage.removeItem(preferenceQuestionnaireDraftKey(sessionId));
-  };
+  const clearDraft = () => clearQuestionnaireDraft(sessionId);
 
   const startQuestionnaire = () => {
     if (!definition) return;

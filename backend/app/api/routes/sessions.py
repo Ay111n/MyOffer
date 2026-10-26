@@ -63,7 +63,9 @@ def restore_report(body: "ReportRestoreRequest", response: Response, request: Re
     portable = body.inputs
     inp = validate_restore(DecisionInput(
         offers=[OfferInput(offer_id=offer.offer_id, display_order=offer.display_order,
-                           company=f"Offer {chr(65 + index)}", position="", facts=offer.facts)
+                           # 归档携带的身份名；旧版归档无此二键（空名）兜底为槽位默认
+                           company=offer.company.strip() or f"Offer {chr(65 + index)}",
+                           position=offer.position.strip(), facts=offer.facts)
                 for index, offer in enumerate(sorted(portable.offers, key=lambda item: item.display_order))],
         preferences=portable.preferences,
     ), rules)

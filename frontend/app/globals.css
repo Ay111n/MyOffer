@@ -231,5 +231,4 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .report-document details > *:not(summary) { display: block !important; }
   .report-document .compare-label { display: block; }
   .report-document a[href^="/results/"] { display: none; }
-  .report-document .recharts-responsive-container { min-width: 0 !important; }
 }

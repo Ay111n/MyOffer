@@ -124,10 +124,17 @@ describe("stabilityCopy", () => {
   });
 
   it("稳定、并列、并列翻转各有表述", () => {
-    expect(stabilityCopy({ ...base, status: "stable", nearest: null, flips: [] }, [a, b]).body).toContain("Offer A 都还是第一");
+    expect(stabilityCopy({ ...base, status: "stable", nearest: null, flips: [] }, [a, b]).body).toContain("Offer A 都保持第一");
+    expect(stabilityCopy({ ...base, status: "stable", nearest: null, flips: [] }, [a, b]).body).toContain("两个维度同时调整");
     expect(stabilityCopy({ ...base, status: "tie", leader_id: null, nearest: null, flips: [] }, [a, b]).level).toBe("tie");
     const tieFlip = { ...flip, ties: true };
     expect(stabilityCopy({ ...base, status: "moderate", nearest: tieFlip }, [a, b]).body).toContain("会和 Offer B 并列");
+  });
+
+  it("margin 有值时附上全向最短距离说明", () => {
+    const copy = stabilityCopy({ ...base, status: "steady", margin: 0.148 }, [a, b]);
+    expect(copy.body).toContain("15 个百分点");
+    expect(copy.body).toContain("无论朝哪个方向");
   });
 });
 

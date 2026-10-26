@@ -1,15 +1,20 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
+import { History as HistoryIcon, Sparkles } from "lucide-react";
 import { NeedSession } from "@/components/flow-shell";
 import { ReportPrint } from "@/components/report-tools";
 import { AiReportAnalysisProvider, AiReportSection } from "@/components/ai-report-analysis";
 import { KeyNumbers, NextSteps, Reasons, Reliability, Scoreboard, Stability, VerdictHero } from "@/components/result-report";
+import { ScenarioPanel } from "@/components/scenario-panel";
 import { Spinner } from "@/components/ui";
-import { useResult } from "@/lib/api/hooks";
+import { hasUnsubmittedDrafts, loadDraftsForSession } from "@/lib/draft-storage";
+import { useOffers, useResetOffer, useResult, useResultHistory } from "@/lib/api/hooks";
 import type { OfferReportView } from "@/lib/api/types";
 import { readApiError } from "@/lib/api/errors";
+import { clearDemoFlag, readDemoFlag } from "@/lib/demo-flag";
 import { preferenceWeightSummary } from "@/lib/preference-questionnaire";
 
 import { buildVerdict } from "@/lib/verdict";
@@ -74,7 +79,6 @@ const reportSections: { key: "economic" | "growth" | "experience"; label: string
     { key: "probation", label: "试用期", metrics: [{ key: "probation_loss", label: "试用期少拿金额", format: "money" }] },
     { key: "purchasing", label: "购买力", metrics: [
       { key: "purchasing_monthly", label: "城市调整后月购买力", format: "money" },
-      { key: "scored_purchasing_monthly", label: "评分参考月购买力", format: "money" },
     ] },
     { key: "benefits", label: "福利", metrics: [{ key: "benefits_annual", label: "年度福利价值", format: "money" }] },
     { key: "housing", label: "买房压力", metrics: [
@@ -142,9 +146,8 @@ const fieldExplanations: Record<string, string> = {
   "economic.entry_income": "签字及安家费、搬迁安置补助、政府人才补贴之和，使用同一名义金额口径。",
   "economic.probation": "这是试用期收入损失的子分。试用期少拿金额相对月薪越少，分数越高；没有填试用期折薪时按没有损失计算。",
   "economic.probation_loss": "税前月薪 × 试用期月数 ×（1－试用期工资比例）。这是试用期相对正常月薪少拿的税前金额。",
-  "economic.purchasing": "展示经城市生活成本调整后的月购买力；子分以 50 分为中性值，只计入城市调整前后购买力档位的分差。现金收入已在常规年度收入中评分，不在这里重复记分。",
-  "economic.purchasing_monthly": "实际常规年度税后现金 ÷ 12 × 全国参考月生活成本 ÷ 工作城市参考月生活成本。若缴费安排触发评分参考口径，评分使用下方另列的参考月购买力。",
-  "economic.scored_purchasing_monthly": "仅当实际缴费与评分参考口径不同时显示。按工资基数缴费的税后现金，再经城市生活成本调整；用于购买力子分的计算。",
+  "economic.purchasing": "子分只由城市物价水平决定：相对全国平均的固定加减分，与收入无关。同城两份 Offer 的购买力子分相同，跨城差距固定，涨薪不会改变这个子分；上方的月购买力金额仍按实际收入折算，仅供对照。",
+  "economic.purchasing_monthly": "实际常规年度税后现金 ÷ 12 × 全国参考月生活成本 ÷ 工作城市参考月生活成本。这是展示用的参考金额，不参与子分计算。",
   "economic.benefits": "这是福利的子分。用单位公积金、餐宿及补充医疗的年度价值相对评分参考年度税后现金的比例评分；个人公积金不重复计入。",
   "economic.benefits_annual": "单位公积金年度缴纳额，加上明确提供的餐宿福利和补充医疗年度价值；不包含个人缴纳部分。",
   "economic.housing": "这是买房压力的子分，仅在选择考虑买房时出现。参考月供占固定税后月收入的比例越低、攒首付时间越短，得分越高。",
@@ -188,7 +191,47 @@ function hasDetail(offers: OfferReportView[]) {
     offers.every((offer) => offer.sub_scores?.[`${section.key}.${category.key}`] != null)));
 }
 
-function ReportAnalysis({ offers }: { offers: OfferReportView[] }) {
+/**
+ * 本机是否有「尚未生成进报告」的草稿。
+ *
+ * 报告是显式生成动作落下的快照：填写页的内容只有点「生成对比报告」才会
+ * 批量提交并重算。直接导航到 /results（顶部导航、书签、刷新）会看到上次
+ * 快照——新用户看起来像"填过的内容丢了"。此处只提示不代提交：自动同步
+ * 会模糊「报告 = 某次显式生成」的可追溯语义，也绕过填写页的缺项校验。
+ */
+function useHasPendingDrafts(sessionId: string | null): boolean {
+  const [pending, setPending] = useState(false);
+  /* eslint-disable react-hooks/set-state-in-effect -- 与 complete 页恢复草稿同一
+   * 惯例：localStorage 只能在水合后的 effect 里读（预渲染 HTML 不含本机状态）。 */
+  useEffect(() => {
+    // 惰性读取放在 effect：首帧（水合前后）都不读 localStorage，避免与
+    // 预渲染 HTML 不一致；sessionId 变化（水合/切会话）后重新评估。
+    setPending(sessionId != null && hasUnsubmittedDrafts(loadDraftsForSession(sessionId)));
+  }, [sessionId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+  return pending;
+}
+
+function DraftsPendingBanner({ sessionId, empty }: { sessionId: string; empty?: boolean }) {
+  return (
+    <div className="no-print mb-8 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-card border border-blue-200 bg-blue-50/70 px-4 py-3.5 sm:px-5">
+      <p className="flex min-h-11 items-center gap-2.5 text-sm leading-6 text-blue-900">
+        <Sparkles aria-hidden="true" className="h-4 w-4 shrink-0 text-blue-700" />
+        {empty
+          ? "本机有尚未生成进报告的填写内容；生成后这里会显示对比结论。"
+          : "填写页有尚未生成进报告的内容，当前报告展示的是上次生成时的状态。"}
+      </p>
+      <Link
+        href="/#offers"
+        className="inline-flex min-h-11 items-center rounded-lg bg-ink px-4 text-sm font-medium text-white transition hover:bg-ink/90"
+      >
+        去填写页生成报告
+      </Link>
+    </div>
+  );
+}
+
+function ReportAnalysis({ offers, historyView = false }: { offers: OfferReportView[]; historyView?: boolean }) {
   const columns = offers.length === 2 ? "grid-cols-2 md:grid-cols-[minmax(10rem,1fr)_repeat(2,minmax(0,1fr))]" : "grid-cols-3 md:grid-cols-[minmax(10rem,1fr)_repeat(3,minmax(0,1fr))]";
   const labelSpan = offers.length === 2 ? "col-span-2 md:col-span-1" : "col-span-3 md:col-span-1";
   const metricValue = (offer: OfferReportView, key: string, format?: Metric["format"]) => {
@@ -225,21 +268,149 @@ function ReportAnalysis({ offers }: { offers: OfferReportView[] }) {
           </div>;
         })}
       </div>
-      <AiReportSection part={section.key} />
+      {historyView
+        ? <p className="no-print text-sm text-slate-500">AI 解读只在最新结果上可用，回到最新后即可生成。</p>
+        : <AiReportSection part={section.key} />}
     </section>;
   })}</div>;
+}
+
+/** 示例报告横幅：一键清空示例数据、回到空白填写页。 */
+function DemoBanner({ sessionId }: { sessionId: string }) {
+  const router = useRouter();
+  const { data: offerRows } = useOffers(sessionId);
+  const resetOffer = useResetOffer();
+  const [leaving, setLeaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const startMyOffers = async () => {
+    if (leaving) return;
+    setLeaving(true);
+    setError(null);
+    try {
+      for (const offer of offerRows ?? []) {
+        await resetOffer.mutateAsync({ sessionId, oid: offer.offer_id, version: offer.version });
+      }
+      clearDemoFlag();
+      router.push("/");
+    } catch (e) {
+      setError("清空示例失败：" + readApiError(e) + "，可稍后重试。");
+      setLeaving(false);
+    }
+  };
+
+  return (
+    <div className="no-print mb-8 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-card border border-blue-200 bg-blue-50/70 px-4 py-3.5 sm:px-5">
+      <p className="flex min-h-11 items-center gap-2.5 text-sm text-blue-900">
+        <Sparkles aria-hidden="true" className="h-4 w-4 shrink-0 text-blue-700" />
+        当前报告由示例数据生成——先看看报告长什么样，再填你自己的 Offer。
+      </p>
+      <button
+        type="button"
+        onClick={() => void startMyOffers()}
+        disabled={leaving}
+        className="inline-flex min-h-11 items-center rounded-lg bg-ink px-4 text-sm font-medium text-white transition hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {leaving ? "清空中…" : "开始填写我的 Offer"}
+      </button>
+      {error && <p role="alert" className="w-full text-sm text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+/** 快照触发类型的中文标签（/results/history 的 trigger_type 头信息）。 */
+const TRIGGER_LABELS: Record<string, string> = {
+  batch_answered: "生成报告",
+  question_answered: "补充作答",
+  manual_stop: "查看结论",
+  offer_created: "新增 Offer",
+  offer_updated: "修改 Offer",
+  preferences_updated: "调整偏好",
+  report_restore: "导入数据",
+  scenario: "试算",
+};
+
+/** 修改记录：历次快照一览，点击只读回看（不恢复旧状态）。 */
+function HistoryPanel({
+  sessionId, currentSeq, offers, onSelect,
+}: {
+  sessionId: string;
+  currentSeq: number;
+  offers: OfferReportView[];
+  onSelect: (seq: number | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const { data: history } = useResultHistory(sessionId);
+  const items = history ?? [];
+  const nameOf = (offerId: string | null | undefined) =>
+    offers.find((o) => o.offer_id === offerId)?.company ?? "—";
+
+  return (
+    <section aria-labelledby="history-title" className="no-print border-t border-hairline py-10">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls="history-list"
+        onClick={() => setOpen((value) => !value)}
+        className="flex min-h-11 w-full items-center gap-3 text-left"
+      >
+        <HistoryIcon aria-hidden="true" className="h-5 w-5 text-slate-500" />
+        <span className="flex-1">
+          <span id="history-title" className="text-base font-semibold text-ink">修改记录</span>
+          <span className="ml-2 text-sm text-slate-500">回看每次生成报告时的结论</span>
+        </span>
+        <span aria-hidden="true" className={`text-slate-400 transition-transform ${open ? "rotate-90" : ""}`}>›</span>
+      </button>
+      {open && (items.length > 1 ? (
+        <ol id="history-list" className="mt-4 divide-y divide-hairline rounded-card border border-hairline">
+          {items.map((item) => {
+            const active = item.seq === currentSeq;
+            return (
+              <li key={item.seq}>
+                <button
+                  type="button"
+                  aria-current={active ? "true" : undefined}
+                  onClick={() => { onSelect(item.seq); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  className={`flex min-h-14 w-full flex-wrap items-center gap-x-5 gap-y-1 px-4 py-3 text-left text-sm transition-colors ${active ? "bg-slate-100 font-medium text-ink" : "text-slate-600 hover:bg-slate-50"}`}
+                >
+                  <span className="tabular-nums text-slate-400">#{item.seq}</span>
+                  <span className="tabular-nums">{new Date(item.created_at).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                  <span>{TRIGGER_LABELS[item.trigger_type] ?? item.trigger_type}</span>
+                  <span className="ml-auto tabular-nums">
+                    {item.top_offer_id ? `${nameOf(item.top_offer_id)} 领先` : "暂无排名"}
+                    {item.top_score != null && ` · ${item.top_score.toFixed(1)} 分`}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      ) : (
+        <p className="mt-3 text-sm text-slate-500">{items.length === 1 ? "目前只有当前这一个版本；修改后重新生成报告，就会在这里留下可回看的历史记录。" : "还没有生成过报告；每次生成都会在这里留一条记录。"}</p>
+      ))}
+    </section>
+  );
 }
 
 function ResultPageInner() {
   const sessionId = useFlowStore((state) => state.sessionId);
   useHydrateSession();
-  const { data: view, isLoading, error } = useResult(sessionId);
+  /** null = 最新快照；数字 = 只读回看该 seq 的历史版本。 */
+  const [viewSeq, setViewSeq] = useState<number | null>(null);
+  const { data: view, isLoading, error } = useResult(sessionId, viewSeq);
+  const { data: historyHead } = useResultHistory(sessionId);
+  const latestSeq = historyHead?.[0]?.seq ?? null;
+  const viewingHistory = viewSeq !== null && latestSeq !== null && viewSeq !== latestSeq;
+  // 惰性读取示例标记：首帧渲染树是 Spinner/NeedSession（无横幅），不存在
+  // 预渲染 HTML 与客户端首帧不一致的问题
+  const [isDemo] = useState(readDemoFlag);
+  const pendingDrafts = useHasPendingDrafts(sessionId);
   useEffect(() => { document.title = "三维对比报告 · MyOffer"; }, []);
 
 
   if (!sessionId) return <NeedSession />;
   if (isLoading) return <Spinner label="正在生成对比…" />;
-  if (!view) return <main className="mx-auto max-w-6xl px-5 py-14"><h1 className="text-2xl font-semibold">对比报告</h1><p className="mt-4 text-sm text-slate-600">{readApiError(error, "请先填写 Offer 信息")}</p><Link href="/complete" className="mt-5 inline-flex min-h-11 items-center text-sm underline">返回填写</Link></main>;
+  if (!view) return <main className="mx-auto max-w-6xl px-5 py-14"><h1 className="text-2xl font-semibold">对比报告</h1><p className="mt-4 text-sm text-slate-600">{readApiError(error, "请先填写 Offer 信息")}</p>{pendingDrafts && <div className="mt-6 max-w-xl"><DraftsPendingBanner sessionId={sessionId} empty /></div>}<Link href="/complete" className="mt-5 inline-flex min-h-11 items-center text-sm underline">返回填写</Link></main>;
 
   const offers = [...(view.offers ?? [])].sort((a, b) => a.display_order - b.display_order);
   const verdict = buildVerdict(offers);
@@ -247,6 +418,14 @@ function ResultPageInner() {
   const weightSummary = preferenceWeightSummary(offers[0]?.effective_weights);
 
   return <AiReportAnalysisProvider sessionId={sessionId} snapshotSeq={view.snapshot_seq} complete={ranked}><main className="report-document mx-auto max-w-5xl text-ink">
+    {isDemo && <DemoBanner sessionId={sessionId} />}
+    {pendingDrafts && !viewingHistory && <DraftsPendingBanner sessionId={sessionId} />}
+    {viewingHistory && (
+      <div className="no-print mb-8 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 rounded-card border border-amber-200 bg-amber-50 px-4 py-3.5 text-sm text-amber-900 sm:px-5">
+        <p>正在查看第 {view.snapshot_seq} 次结果（历史版本，生成于 {new Date(view.computed_at).toLocaleString("zh-CN")}），仅供参考对照。</p>
+        <button type="button" onClick={() => setViewSeq(null)} className="min-h-11 rounded-lg border border-amber-300 bg-white px-4 font-medium text-amber-900 hover:bg-amber-100">回到最新</button>
+      </div>
+    )}
     <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 pb-5">
       <div>
         <h1 className="text-lg font-semibold tracking-tight text-ink">三维对比报告</h1>
@@ -273,17 +452,26 @@ function ResultPageInner() {
     <Reasons verdict={verdict} attribution={view.attribution} />
     <KeyNumbers offers={offers} />
     <Stability offers={offers} sensitivity={view.sensitivity} />
+    {!viewingHistory && ranked && (
+      <ScenarioPanel sessionId={sessionId} snapshotSeq={view.snapshot_seq} offers={offers} />
+    )}
     <Reliability offers={offers} verdict={verdict} />
     <NextSteps offers={offers} />
 
-    <section aria-label="总体结果分析"><AiReportSection part="overall" /></section>
+    <section aria-label="总体结果分析">
+      {viewingHistory
+        ? <p className="no-print text-sm text-slate-500">AI 解读只在最新结果上可用，回到最新后即可生成。</p>
+        : <AiReportSection part="overall" />}
+    </section>
 
     {hasDetail(offers) && <div id="details" className="mt-4 border-t-2 border-ink pt-10">
       <p className="eyebrow">详细依据</p>
       <h2 className="section-title mt-2">每一分是怎么来的</h2>
       <p className="section-lede mb-10 mt-2">需要核对细节时再看这里：各维度的分项、具体数字，以及税后和五险一金的逐月计算。</p>
-      <ReportAnalysis offers={offers} />
+      <ReportAnalysis offers={offers} historyView={viewingHistory} />
     </div>}
+
+    <HistoryPanel sessionId={sessionId} currentSeq={view.snapshot_seq} offers={offers} onSelect={setViewSeq} />
   </main></AiReportAnalysisProvider>;
 }
 

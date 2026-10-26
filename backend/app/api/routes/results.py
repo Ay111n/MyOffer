@@ -9,7 +9,10 @@ from app.rules_runtime import get_rules
 from app.schemas import (
     HistoryResponse,
     ReportArchive,
+    ReportScenarioRequest,
+    ReportScenarioSolveRequest,
     ResultResponse,
+    ScenarioSolveResponse,
 )
 from app.schemas.ai import AiJobResponse, AiReportRequest
 from app.services import conclusion as conclusion_service
@@ -107,8 +110,49 @@ def export_report(session=Depends(require_owned_session), db: Session = Depends(
     inp = assemble_decision_input(db, session, get_rules())
     return ReportArchive(inputs={"offers": [{"offer_id": offer.offer_id,
                                               "display_order": offer.display_order,
+                                              "company": offer.company,
+                                              "position": offer.position,
                                               "facts": offer.facts} for offer in inp.offers],
                                  "preferences": inp.preferences})
+
+
+@router.post("/report/scenario", response_model=ResultResponse)
+def run_scenario(
+    body: ReportScenarioRequest,
+    session=Depends(require_owned_session), db: Session = Depends(get_db),
+):
+    """免写入试算：在最新快照上按调整值（月薪/奖金倍数/工时/通勤）重打一次分。
+
+    只接受最新快照的 seq（防陈旧，与 AI 分析同一守卫）；scenario() 全程
+    不落库、不产生新快照，返回的是一次性的对比结果投影。"""
+    from app.services.report_tools import scenario as run_trial
+
+    row = _get_snapshot_row(db, session)
+    if row.seq != body.snapshot_seq:
+        raise HTTPException(409, detail={"code": "stale_report",
+                                         "message": "报告已更新，请刷新后再试算。"})
+    snapshot = _load_snapshot(row)
+    trial = run_trial(snapshot, body, get_rules())
+    return ResultResponse(data=conclusion_service.build_result_view(trial, get_rules(), row.seq))
+
+
+@router.post("/report/scenario/solve", response_model=ScenarioSolveResponse)
+def solve_parity(
+    body: ReportScenarioSolveRequest,
+    session=Depends(require_owned_session), db: Session = Depends(get_db),
+):
+    """反解追平点：目标 Offer 的月薪谈到多少能追平当前第一名。
+
+    与试算同一防陈旧守卫（只接受最新快照 seq）；内部反复调用免写入
+    试算二分求解，全程不落库、不产生新快照。"""
+    from app.services.report_tools import solve_parity as run_solve
+
+    row = _get_snapshot_row(db, session)
+    if row.seq != body.snapshot_seq:
+        raise HTTPException(409, detail={"code": "stale_report",
+                                         "message": "报告已更新，请刷新后再反解。"})
+    snapshot = _load_snapshot(row)
+    return ScenarioSolveResponse(data=run_solve(snapshot, body, get_rules()))
 
 
 @router.post("/report/ai-analysis", response_model=AiJobResponse, status_code=202)

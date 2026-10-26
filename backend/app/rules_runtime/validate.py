@@ -43,29 +43,11 @@ _AS_OF_RE = re.compile(r"^(\d{4})-(0[1-9]|1[0-2])$")
 # 缴费年度数据每年 7 月前后更新，14 个月 ≈ 新年度公布后仍留 1-2 个月缓冲。
 CITY_DATA_STALE_MONTHS = 14
 
-# report.yaml 中映射到枚举字段的配置节：映射按字段名分键，
-# 每个字段的映射必须覆盖该字段的全部选项（含 unclear），防止死档位。
-ENUM_MAP_BINDINGS: dict[str, list[str]] = {
-    "development.maps": [
-        "business_level", "business_growth_expectation", "boss_resource_ability",
-        "boss_ability", "boss_attitude", "communication_style",
-    ],
-    "stability.maps": ["kpi_pressure"],
-    "health.maps": ["weekend_pattern", "travel_frequency", "expected_mental_state"],
-}
-
+# report.yaml 中映射到枚举字段的配置节随 v0.8 模块（development/stability/
+# health）退役一并移除；若未来新增枚举映射，须同步登记覆盖校验。
 
 def _field_option_values(spec: dict) -> set:
     return {o["value"] for o in spec.get("options", [])}
-
-
-def _node(root: dict, dotted: str) -> dict:
-    node: object = root
-    for part in dotted.split("."):
-        if not isinstance(node, dict):
-            return {}
-        node = node.get(part, {})
-    return node if isinstance(node, dict) else {}
 
 
 def _score_of(band: dict, key: str) -> float:
@@ -133,31 +115,6 @@ def _check_max_bands(bands: list, name: str, issues: list[str], *,
         prev = u
     if not bands:
         issues.append(f"report.yaml {name}: empty bands")
-
-
-def _check_numeric_band_scores(bands: list, name: str, issues: list[str], *,
-                               lo: float = 0.0, hi: float = 100.0) -> None:
-    """数值型档位分必须落在 [lo, hi]（模块分/扣分点的取值域）。"""
-    for i, band in enumerate(bands):
-        try:
-            sc = float(band["score"])
-        except (KeyError, TypeError, ValueError):
-            issues.append(f"report.yaml {name}: band {i} missing/unparsable score")
-            return
-        if not lo <= sc <= hi:
-            issues.append(f"report.yaml {name}: score {sc} outside [{lo}, {hi}]")
-
-
-def _map_scores(mapping: dict, name: str, issues: list[str], *,
-                lo: float = 0.0, hi: float = 100.0) -> None:
-    for value_key, score in mapping.items():
-        try:
-            sc = float(score)
-        except (TypeError, ValueError):
-            issues.append(f"report.yaml {name}.{value_key}: unparsable score {score!r}")
-            continue
-        if not lo <= sc <= hi:
-            issues.append(f"report.yaml {name}.{value_key}: score {sc} outside [{lo}, {hi}]")
 
 
 def _try_float(value) -> float | None:
@@ -308,13 +265,6 @@ def validate_rules(rules: RuleSet) -> list[str]:
         if set(category_weights) != {"time", "rest", "boundary", "daily"} or abs(sum(category_weights.values()) - 1) > 1e-9:
             v.append("report.yaml three_dimension_scoring.experience: invalid category weights")
 
-    money_w = report.get("money_module_weights", {})
-    salary_modules = set(dims.get("economic", {}).get("modules", []))
-    if set(money_w) != salary_modules:
-        v.append(f"report.yaml: money_module_weights keys {sorted(money_w)} != compensation modules {sorted(salary_modules)}")
-    elif abs(sum(money_w.values()) - 1.0) > 1e-9:
-        v.append(f"report.yaml: money_module_weights sum to {sum(money_w.values())}, expected 1.0")
-
     tax = report.get("tax", {})
     for table_key in ("cumulative_brackets", "bonus_monthly_brackets"):
         brackets = tax.get(table_key, [])
@@ -392,19 +342,22 @@ def validate_rules(rules: RuleSet) -> list[str]:
 
     living_cfg = report.get("living", {})
     if not living_cfg:
-        v.append("report.yaml: missing living（模块 5 全国平均口径常量）")
+        v.append("report.yaml: missing living（购买力评分的全国成本锚点）")
     else:
-        for const_key in ("national_avg_wage_month", "national_baseline_cost_month",
-                          "comfort_wage_multiple"):
-            val = _try_float(living_cfg.get(const_key))
-            if val is None or val <= 0:
-                v.append(f"report.yaml: living.{const_key}={living_cfg.get(const_key)!r} missing or non-positive")
+        # v5 购买力子分只消费全国成本锚点；平均工资/舒适线常量已随 v0.8 退役
+        val = _try_float(living_cfg.get("national_baseline_cost_month"))
+        if val is None or val <= 0:
+            v.append(f"report.yaml: living.national_baseline_cost_month={living_cfg.get('national_baseline_cost_month')!r} missing or non-positive")
 
-    for key in ("salary_score_bands", "insurance_score_ratio_bands", "hourly_score_bands", "living_multiple_bands"):
-        if not report.get(key):
-            v.append(f"report.yaml: missing {key}")
-        else:
-            _check_min_bands(report[key], key, v)
+    if not report.get("salary_score_bands"):
+        v.append("report.yaml: missing salary_score_bands")
+    else:
+        _check_min_bands(report["salary_score_bands"], "salary_score_bands", v)
+    if not report.get("purchasing_city_bands"):
+        v.append("report.yaml: missing purchasing_city_bands")
+    else:
+        _check_max_bands(report["purchasing_city_bands"], "purchasing_city_bands",
+                         v, key="max", score_key="score")
     if not report.get("housing_payment_ratio_bands"):
         v.append("report.yaml: missing housing_payment_ratio_bands")
     else:
@@ -416,107 +369,9 @@ def validate_rules(rules: RuleSet) -> list[str]:
         _check_max_bands(report["housing_tenure_adjust"], "housing_tenure_adjust",
                          v, key="max_years", score_key="score")
 
-    dev = report.get("development", {})
-    if not dev.get("axes") or not dev.get("city_axis", {}).get("label"):
-        v.append("report.yaml development: axes/city_axis incomplete")
-    # city_axis 只声明展示 label：城市等级轴固定取 city_index 的 tier_score，
-    # 未知键一律报错，防止「配置了但不生效」的死配置再次积累
-    unknown_city_axis_keys = set(dev.get("city_axis", {})) - {"label"}
-    if unknown_city_axis_keys:
-        v.append(f"report.yaml development.city_axis: unknown keys {sorted(unknown_city_axis_keys)}"
-                 "（城市等级轴固定取 city_index 的 tier_score，仅允许 label）")
-    dev_labels = [str(a.get("label")) for a in dev.get("axes", []) if a.get("label")]
-    if dev.get("city_axis", {}).get("label"):
-        dev_labels.append(str(dev["city_axis"]["label"]))
-    if len(dev_labels) != len(set(dev_labels)):
-        v.append("report.yaml development: axis labels must be unique (雷达轴按 label 合并)")
-    for axis in dev.get("axes", []):
-        numeric = axis.get("numeric")
-        if not numeric:
-            continue
-        try:
-            lo, hi = float(numeric["min"]), float(numeric["max"])
-        except (KeyError, TypeError, ValueError):
-            v.append(f"report.yaml development: axis '{axis.get('field')}' numeric min/max unparsable")
-            continue
-        if lo >= hi:
-            v.append(f"report.yaml development: axis '{axis.get('field')}' numeric min must be < max")
-    for dotted, field_keys in ENUM_MAP_BINDINGS.items():
-        map_root = _node(report, dotted)
-        for field_key in field_keys:
-            mapping = map_root.get(field_key, {})
-            spec = rules.fields.get(field_key, {})
-            options = _field_option_values(spec)
-            if not options:
-                v.append(f"report.yaml {dotted}: field '{field_key}' has no options")
-            elif set(mapping) != options:
-                v.append(f"report.yaml {dotted}.{field_key}: keys {sorted(mapping)} != field options {sorted(options)}")
-
-    dev_map_fields = {a.get("field") for a in dev.get("axes", [])} - {None}
-    numeric_fields = {a.get("field") for a in dev.get("axes", []) if a.get("numeric")}
-    for fk in dev_map_fields - numeric_fields:
-        if fk not in dev.get("maps", {}):
-            v.append(f"report.yaml development.maps: missing mapping for axis field '{fk}'")
-
-    stab = report.get("stability", {})
-    if not stab.get("components"):
-        v.append("report.yaml stability: missing components")
-    stab_map_fields = {c.get("field") for c in stab.get("components", []) if not c.get("bands")} - {None}
-    for fk in stab_map_fields:
-        if fk not in stab.get("maps", {}):
-            v.append(f"report.yaml stability.maps: missing mapping for component field '{fk}'")
-    penalty = stab.get("outsourced_penalty")
-    if penalty is not None:
-        # 转换入 try：null/非数值字符串应记为校验违规（附定位），而非让校验器自身崩溃
-        try:
-            p = float(penalty)
-        except (TypeError, ValueError):
-            v.append(f"report.yaml stability: outsourced_penalty={penalty!r} is not a number")
-        else:
-            if not 0.0 <= p <= 100.0:
-                v.append(f"report.yaml stability: outsourced_penalty={penalty} outside [0, 100]")
-    for comp in stab.get("components", []):
-        if comp.get("bands"):
-            _check_numeric_band_scores(comp["bands"], f"stability component '{comp.get('key')}'", v)
-    for fk, mapping in stab.get("maps", {}).items():
-        _map_scores(mapping, f"stability.maps.{fk}", v)
-    total_w = sum(float(c.get("weight", 0)) for c in stab.get("components", []))
-    if stab.get("components") and abs(total_w - 1.0) > 1e-9:
-        v.append(f"report.yaml stability: component weights sum to {total_w}, expected 1.0")
-
-    health = report.get("health", {})
-    if not health.get("deductions"):
-        v.append("report.yaml health: missing deductions")
-    health_map_fields = {d.get("source") for d in health.get("deductions", [])
-                         if not d.get("bands")} - {None}
-    for fk in health_map_fields:
-        if fk not in health.get("maps", {}):
-            v.append(f"report.yaml health.maps: missing mapping for deduction source '{fk}'")
-    for item in health.get("deductions", []):
-        if item.get("bands"):
-            _check_numeric_band_scores(item["bands"], f"health deduction '{item.get('key')}'", v)
-        # missing_score：映射项未作答时的中性扣分（填了不吃亏口径），必须在扣分值域内
-        ms = item.get("missing_score")
-        if ms is not None:
-            try:
-                ms_v = float(ms)
-            except (TypeError, ValueError):
-                v.append(f"report.yaml health deduction '{item.get('key')}': unparsable missing_score {ms!r}")
-            else:
-                if not 0.0 <= ms_v <= 100.0:
-                    v.append(f"report.yaml health deduction '{item.get('key')}': missing_score {ms_v} outside [0, 100]")
-    for fk, mapping in health.get("maps", {}).items():
-        _map_scores(mapping, f"health.maps.{fk}", v)
-    if health.get("grade_bands"):
-        _check_max_bands(health["grade_bands"], "health.grade_bands", v, key="max")
-        for band in health["grade_bands"]:
-            if not band.get("label"):
-                v.append("report.yaml health.grade_bands: band missing label")
-
+    # v5 引擎只消费 salary 与 housing 两套等级（report.py _grade）
     grades = report.get("grades", {})
-    # health 等级走 health.grade_bands（损耗分越低越好，max 分档）
-    for module in ("salary", "insurance", "efficiency", "housing", "living",
-                   "development", "stability"):
+    for module in ("salary", "housing"):
         if module not in grades:
             v.append(f"report.yaml grades: missing module '{module}'")
             continue
@@ -524,8 +379,6 @@ def validate_rules(rules: RuleSet) -> list[str]:
         for band in grades[module]:
             if not band.get("label"):
                 v.append(f"report.yaml grades.{module}: band missing label")
-    if not health.get("grade_bands"):
-        v.append("report.yaml health: missing grade_bands")
 
     # ── 5. preferences（默认权重与问卷契约）──────────────────
     default_weights = rules.default_weights()
@@ -723,15 +576,16 @@ def policy_expiry_warnings(rules: RuleSet, today: date | None = None) -> list[st
     return warnings
 
 
-def city_data_warnings(rules: RuleSet, today: date | None = None) -> list[str]:
-    """城市数据新旧度警告（非阻断，loader 启动时记日志）。
+def stale_city_entries(rules: RuleSet, today: date | None = None) -> list[tuple[str, str, int]]:
+    """结构化的城市数据新旧度清单：[(城市, as_of "YYYY-MM", 距今月数)]。
 
-    as_of 超过 CITY_DATA_STALE_MONTHS 个月的城市提示复核——通常是新缴费年度
-    基数已公布而本文件未跟进。缺 as_of 或格式非法的沉默跳过（硬约束由
-    validate_rules 拦截）。"""
+    as_of 距今超过 CITY_DATA_STALE_MONTHS 个月的城市入选，按月数降序（最旧
+    在前）。缺 as_of 或格式非法的沉默跳过（硬约束由 validate_rules 拦截）。
+    loader 启动警告与 tools/city-data/check_staleness.py 共用此口径，避免
+    两处各写一份"多旧算旧"。"""
     today = today or date.today()
     cities = (rules.data.get("city_index") or {}).get("cities") or {}
-    warnings: list[str] = []
+    entries: list[tuple[str, str, int]] = []
     for ck, cfg in cities.items():
         if not isinstance(cfg, dict):
             continue
@@ -741,8 +595,19 @@ def city_data_warnings(rules: RuleSet, today: date | None = None) -> list[str]:
         year, month = int(match.group(1)), int(match.group(2))
         age_months = (today.year - year) * 12 + (today.month - month)
         if age_months > CITY_DATA_STALE_MONTHS:
-            warnings.append(
-                f"城市 {ck} 参考数据截至 {year}-{month:02d}（{age_months} 个月前），"
-                f"超过 {CITY_DATA_STALE_MONTHS} 个月未更新，建议复核最新缴费年度基数与房价"
-            )
-    return warnings
+            entries.append((str(ck), f"{year}-{month:02d}", age_months))
+    entries.sort(key=lambda item: item[2], reverse=True)
+    return entries
+
+
+def city_data_warnings(rules: RuleSet, today: date | None = None) -> list[str]:
+    """城市数据新旧度警告（非阻断，loader 启动时记日志）。
+
+    as_of 超过 CITY_DATA_STALE_MONTHS 个月的城市提示复核——通常是新缴费年度
+    基数已公布而本文件未跟进。缺 as_of 或格式非法的沉默跳过（硬约束由
+    validate_rules 拦截）。"""
+    return [
+        f"城市 {ck} 参考数据截至 {as_of}（{age_months} 个月前），"
+        f"超过 {CITY_DATA_STALE_MONTHS} 个月未更新，建议复核最新缴费年度基数与房价"
+        for ck, as_of, age_months in stale_city_entries(rules, today)
+    ]

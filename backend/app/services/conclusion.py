@@ -3,60 +3,24 @@
 全部为纯函数：输入 DecisionSnapshot（+ rules），输出前端资源模型。
 **禁止调用 evaluate** —— /result、/results/{seq} 只读快照。
 
-洞察文案（insights）按模块模板确定性生成：跨 Offer 比较各模块关键数字，
-缺失值的 Offer 不参与比较；可用数据 < 2 个 Offer 时输出信息不足提示。
+v5 报告的洞察/结论文案由前端纯函数（lib/verdict.ts）基于下发的分数与
+归因生成；本模块只做快照 → ResultView 的字段投影与 Top-2 归因摘要。
 """
 from __future__ import annotations
 
 from app.domain.contracts import DecisionSnapshot, OfferReport
 from app.rules_runtime import RuleSet
 from app.schemas import (
-    DevelopmentModuleView,
-    EfficiencyModuleView,
-    HealthModuleView,
     HistoryItem,
     HousingModuleView,
     InsuranceItemView,
     InsuranceModuleView,
-    LivingModuleView,
     MonthSalaryRowView,
     OfferReportView,
     ResultView,
     SalaryModuleView,
-    StabilityModuleView,
 )
 from app.services.sensitivity import compute_sensitivity
-
-MODULE_TITLES: dict[str, str] = {
-    "salary": "税后薪资",
-    "insurance": "五险一金",
-    "efficiency": "赚钱效率",
-    "housing": "买房预期",
-    "living": "生活水平",
-    "development": "发展水平",
-    "stability": "稳定性",
-    "health": "健康损耗",
-}
-
-DIMENSION_LABELS: dict[str, str] = {"compensation": "钱", "development": "发展",
-                                    "stability": "稳定", "wellbeing": "健康"}
-
-
-def _offer(snapshot: DecisionSnapshot, oid) -> OfferReport | None:
-    return next((o for o in snapshot.outputs.offers if o.offer_id == oid), None)
-
-
-def _fmt_wan(v: float) -> str:
-    if abs(v) >= 10000:
-        return f"{v / 10000:.1f} 万"
-    return f"{v:,.0f}"
-
-
-def _pct(high: float, low: float) -> int:
-    if low <= 0:
-        return 0
-    return round((high - low) / low * 100)
-
 
 # ── 视图映射 ────────────────────────────────────────────────────
 
@@ -64,20 +28,17 @@ def _offer_view(r: OfferReport) -> OfferReportView:
     return OfferReportView(
         offer_id=r.offer_id, company=r.company, position=r.position,
         display_order=r.display_order,
-        city=r.city, employment_label=r.employment_label,
+        city=r.city,
         monthly_after_tax=r.monthly_after_tax,
         overall_score=r.overall_score, overall_rank=r.overall_rank,
-        money_score=r.money_score, dimension_scores=dict(r.dimension_scores),
-        completeness=r.completeness, missing_modules=list(r.missing_modules),
-        quality=r.quality, effective_weights=r.effective_weights,
+        dimension_scores=dict(r.dimension_scores),
+        effective_weights=r.effective_weights,
         score_contributions=r.score_contributions, city_data_as_of=r.city_data_as_of,
         key_numbers=r.key_numbers, sub_scores=r.sub_scores,
         sub_metrics=r.sub_metrics, sub_details=r.sub_details, missing_core=r.missing_core,
         known_optional=r.known_optional,
         input_values=r.input_values,
-        city_pending=r.city_pending,
         compliance_alert=r.compliance_alert,
-        context_chips=list(r.context_chips),
         salary=SalaryModuleView(
             income=r.salary.income,
             score=r.salary.score, grade=r.salary.grade,
@@ -102,11 +63,6 @@ def _offer_view(r: OfferReport) -> OfferReportView:
             employer_monthly=r.insurance.employer_monthly,
             total_monthly=r.insurance.total_monthly,
         ),
-        efficiency=EfficiencyModuleView(
-            score=r.efficiency.score, grade=r.efficiency.grade,
-            hourly=r.efficiency.hourly, daily=r.efficiency.daily,
-            idle_ratio=r.efficiency.idle_ratio,
-        ),
         housing=HousingModuleView(
             score=r.housing.score, grade=r.housing.grade,
             down_payment=r.housing.down_payment,
@@ -116,86 +72,7 @@ def _offer_view(r: OfferReport) -> OfferReportView:
             welfare_annual=r.housing.welfare_annual,
             signing_bonus=r.housing.signing_bonus,
         ),
-        living=LivingModuleView(
-            score=r.living.score, grade=r.living.grade,
-            income_multiple=r.living.income_multiple,
-            purchasing_power=r.living.purchasing_power,
-            comfort_gap=r.living.comfort_gap,
-        ),
-        development=DevelopmentModuleView(
-            score=r.development.score, grade=r.development.grade,
-            axes=dict(r.development.axes),
-        ),
-        stability=StabilityModuleView(
-            score=r.stability.score, grade=r.stability.grade,
-            components=dict(r.stability.components),
-        ),
-        health=HealthModuleView(
-            score=r.health.cost, grade=r.health.grade,
-            cost=r.health.cost, deductions=dict(r.health.deductions),
-            main_deduction=r.health.main_deduction,
-            health_score=r.health.health_score,
-        ),
     )
-
-
-# ── 洞察模板 ────────────────────────────────────────────────────
-
-def _comparison(offers, pick, label, unit="", lower=False, digits=0):
-    vals = [(o, pick(o)) for o in offers if pick(o) is not None]
-    if len(vals) < 2:
-        names = "、".join(o.company for o, _ in vals)
-        return f"{label}有效数据不足两份，暂不比较。" + (f"目前仅 {names} 可计算。" if names else "")
-    displayed = [(o, round(v, digits)) for o, v in vals]
-    target = (min if lower else max)(v for _, v in displayed)
-    leaders = [o.company for o, v in displayed if v == target]
-    scope = "参与比较：" + "、".join(o.company for o, _ in vals) + "。"
-    if len(leaders) == len(vals):
-        return f"{label}按展示精度持平（{target:,.{digits}f}{unit}）。{scope}"
-    name = "、".join(leaders)
-    suffix = "并列" if len(leaders) > 1 else ""
-    direction = "最低" if lower else "最高"
-    return f"{name} {label}{suffix}{direction}（{target:,.{digits}f}{unit}）。{scope}"
-
-
-def _insight_salary(offers):
-    return _comparison(offers, lambda o: o.salary.income.annual_cash_net, "常规年度税后现金", " 元")
-
-
-def _insight_insurance(offers):
-    return _comparison(offers, lambda o: o.insurance.total_monthly, "五险一金月缴合计", " 元")
-
-
-def _insight_efficiency(offers):
-    return _comparison(offers, lambda o: o.efficiency.hourly, "常规现金时薪", " 元")
-
-
-def _insight_housing(offers):
-    return _comparison(offers, lambda o: o.housing.down_payment_years, "攒首付年限", " 年", True, 1)
-
-
-def _insight_living(offers):
-    return _comparison(offers, lambda o: o.living.income_multiple, "收入倍数", " 倍", digits=2)
-
-
-def _insight_development(offers):
-    return _comparison(offers, lambda o: o.development.score, "发展评分", " 分")
-
-
-def _insight_stability(offers):
-    return _comparison(offers, lambda o: o.stability.score, "稳定评分", " 分")
-
-
-def _insight_health(offers):
-    return _comparison(offers, lambda o: o.health.cost, "健康损耗", " 分", True)
-
-
-_INSIGHT_BUILDERS = {
-    "salary": _insight_salary, "insurance": _insight_insurance,
-    "efficiency": _insight_efficiency, "housing": _insight_housing,
-    "living": _insight_living, "development": _insight_development,
-    "stability": _insight_stability, "health": _insight_health,
-}
 
 
 def decision_summary(offers):
@@ -223,7 +100,6 @@ def decision_summary(offers):
 def build_result_view(snapshot: DecisionSnapshot, rules: RuleSet, seq: int) -> ResultView:
     outputs = snapshot.outputs
     offers = list(outputs.offers)
-    insights = {}
     overall_scores = {
         str(r.offer_id): r.overall_score for r in offers if r.overall_score is not None
     }
@@ -239,7 +115,7 @@ def build_result_view(snapshot: DecisionSnapshot, rules: RuleSet, seq: int) -> R
         overall_scores=overall_scores,
         city_data_version=outputs.city_data_version,
         offers=[_offer_view(r) for r in offers],
-        insights=insights,
+        insights={},
         sensitivity=compute_sensitivity(offers, dict(outputs.weights)),
     )
 

@@ -1,28 +1,17 @@
-"""八模块对比报告引擎（v0.8）。
+"""报告引擎的共享基础件（v5）。
 
-取代 v0.6 的四维可比性评分：不再做跨候选可比性裁剪，而是对每个 Offer
-独立算出 8 个模块的数值行 + 0-100 模块分，再按问卷权重加权成综合评分。
+当前活跃引擎是 report_v5.build_report（evaluator 唯一入口）；本模块提供
+它依赖的取值/分档工具与跨版本共用的模块计算：五险一金、税后薪资、买房、
+合规提示与城市上下文。v0.8 八模块引擎已随三维评分改版退役（git 历史留档）。
 
-模块与「钱/发展/稳定/健康」的对应（report.yaml decision_dimensions）：
-  钱   = salary + insurance + efficiency + housing + living 加权
-  发展 = development（八轴雷达均分）
-  稳定 = stability（组件加权 − 外包折减）
-  健康 = 100 − health 损耗分
-
-缺失语义：某模块的必需输入缺失时该模块分/行值为 None（前端显示「—」，
-等级「待补充」），综合评分在可用维度上重归一——缺失不惩罚也不托底。
-城市差异（费率/房价/生活成本/城市等级）来自 data/city_index.yaml；
-城市未填或不在 universe 时城市类模块待补充，绝不按空配置静默算错
-（生活水平模块例外：按全国平均口径兜底计算，city_pending 标记仍展示）。
-
-可信度口径（与 report.yaml 头注一致）：
+关键口径（与 report.yaml 头注一致）：
 - 分数档位按档内线性插值取分，输入小幅扰动不产生排名悬崖；
 - 年终奖择优计税；入职收入并入综合所得，按年度总税差估算；
 - 公积金缴存（个人+单位）单列为账户福利，不计入年度现金；
-- 同一事实只在一处惩罚（管饭/管住归钱，KPI/天数归稳定，健康只留消耗类）；
-- 健康扣分项未作答按中性档扣分（填了不吃亏），数值项缺失则模块待补充。
+- 城市差异（费率/房价/生活成本）来自 data/city_index.yaml；城市未填或不在
+  universe 时城市类输入按缺失处理，绝不按空配置静默算错。
 
-纯函数：输入 DecisionInput + RuleSet，输出 ReportOutputs。
+纯函数：输入 OfferInput + RuleSet，输出模块结果。
 """
 from __future__ import annotations
 
@@ -30,23 +19,14 @@ import math
 from dataclasses import dataclass
 
 from app.domain.contracts import (
-    DecisionInput,
-    DevelopmentModule,
-    EfficiencyModule,
-    HealthModule,
     HousingModule,
     IncomeBreakdown,
     InsuranceItemRow,
     InsuranceModule,
-    LivingModule,
     MonthSalaryRow,
     OfferInput,
-    OfferReport,
-    ReportOutputs,
     SalaryModule,
-    StabilityModule,
 )
-from app.domain.report_quality import report_quality
 from app.rules_runtime import RuleSet
 
 # ── 基础取值与分档工具 ──────────────────────────────────────────
@@ -100,32 +80,10 @@ def _band_max(value: float, bands: list[dict], key: str = "max") -> float:
     return _interp(value, points)
 
 
-def _band_max_label(value: float, bands: list[dict]) -> str:
-    """按 max 升序查档并返回档位 label（health.grade_bands 用，等级保持分档制）。"""
-    for band in bands:
-        mx = band.get("max")
-        if mx is None or value <= float(mx):
-            return str(band["label"])
-    return str(bands[-1]["label"])
-
-
 def _band_min(value: float, bands: list[dict]) -> float:
     """min 型插值分档（值越大分越高）：按 min 升序在相邻档间线性插值。"""
     points = sorted((float(b["min"]), float(b["score"])) for b in bands)
     return _interp(value, points)
-
-
-def _numeric_deduction(offer: OfferInput, item: dict) -> float | None:
-    """数值型扣分源取值；主源缺失时尝试带倍率的 fallback 源（如通勤小时 → 分钟）。"""
-    raw = _num(offer, item.get("source", ""))
-    if raw is not None:
-        return raw
-    fb = item.get("fallback") or {}
-    fb_source = fb.get("source")
-    if not fb_source:
-        return None
-    fb_value = _num(offer, fb_source)
-    return None if fb_value is None else fb_value * float(fb.get("scale", 1.0))
 
 
 def _grade(rules: RuleSet, module: str, score: float | None) -> str:
@@ -135,16 +93,6 @@ def _grade(rules: RuleSet, module: str, score: float | None) -> str:
         if score >= float(band["min"]):
             return str(band["label"])
     return "待补充"
-
-
-def _ordinal(mapping: dict, value: str | None) -> float | None:
-    if value is None:
-        return None
-    return mapping.get(value)
-
-
-def _avg(values: list[float]) -> float | None:
-    return sum(values) / len(values) if values else None
 
 
 def _clamp(v: float, lo: float = 0.0, hi: float = 100.0) -> float:
@@ -304,23 +252,12 @@ def _compliance_alert(offer: OfferInput, ctx: OfferContext) -> bool:
             or _below_floor(_text(offer, "housing_fund_base_type"), "hf_bounds"))
 
 
-def _context_chips(offer: OfferInput, rules: RuleSet) -> list[str]:
-    """不计分的个人情境参考 chips（排序卡副标题展示）：离家远近/城市好感/工作环境。"""
-    chips: list[str] = []
-    distance = _enum_label(rules, "distance_from_home", _text(offer, "distance_from_home"))
-    if distance:
-        chips.append(distance)
-    affinity = _num(offer, "city_affinity")
-    if affinity is not None:
-        chips.append(f"城市好感 {int(affinity)}/5")
-    environment = _enum_label(rules, "work_environment", _text(offer, "work_environment"))
-    if environment:
-        chips.append(environment)
-    return chips
-
-
-def _offer_context(offer: OfferInput, rules: RuleSet) -> OfferContext:
-    city, city_ok = _city_cfg(rules, offer)
+def _offer_context(offer: OfferInput, rules: RuleSet,
+                   city: dict | None = None, city_ok: bool | None = None) -> OfferContext:
+    """city/city_ok 可由调用方传入：同一 Offer 的评分/现金参考/展示三个变体
+    城市完全相同（城市字段不参与变体改写），共享一次查询避免重复解析。"""
+    if city is None:
+        city, city_ok = _city_cfg(rules, offer)
     insurance = _insurance_module(offer, rules, city, city_ok)
     hf = next((i for i in insurance.items if i.item == "住房公积金"), None)
     # 用户要求缴社保/公积金，但城市参数不可用 → 薪资模块无法扣个人五险一金，整体待补充；
@@ -370,12 +307,16 @@ def _monthly_rows(base: float, personal_deduction: float, monthly_deduction: flo
                   brackets: list[dict]) -> tuple[list[MonthSalaryRow], float]:
     """累计预扣法 12 个月明细；到手 = 税前 − 个税 − 个人五险一金。
 
+    累计应纳税所得额跨月结转、不做逐月截断（负余额由后续月份吸收），
+    与年度择优公式 12×(月薪−月扣除) 共用同一累计语义；税额非负由
+    _cum_tax 的 max(0,·) 与月税增量兜底。月薪恒定时与逐月截断取值一致。
+
     返回 (rows, 全年个税)。"""
     rows: list[MonthSalaryRow] = []
     cum_taxable = 0.0
     cum_tax = 0.0
     for m in range(1, 13):
-        cum_taxable += max(0.0, base - monthly_deduction)
+        cum_taxable += base - monthly_deduction
         tax_cum = _cum_tax(cum_taxable, brackets)
         tax_m = max(0.0, tax_cum - cum_tax)
         cum_tax = tax_cum
@@ -437,6 +378,7 @@ def _salary_module(offer: OfferInput, rules: RuleSet, ctx: OfferContext) -> Sala
     brackets = tax_cfg.get("cumulative_brackets", [])
     bonus_brackets = tax_cfg.get("bonus_monthly_brackets", [])
     # 保留全年扣除余额，低收入时由奖金/入职收入使用，不能提前截断为 0。
+    # 与 _monthly_rows 同一累计口径：taxable 恰等于 12 个月的累计应纳税所得额。
     taxable = 12.0 * (monthly_pre - monthly_deduction)
 
     def annual_total_tax(entry: float) -> tuple[float, str]:
@@ -484,44 +426,7 @@ def _salary_module(offer: OfferInput, rules: RuleSet, ctx: OfferContext) -> Sala
     )
 
 
-# ── 模块 2-5 ────────────────────────────────────────────────────
-
-def _insurance_score(offer: OfferInput, rules: RuleSet, ctx: OfferContext) -> tuple[float | None, str]:
-    ins = ctx.insurance
-    base = _num(offer, "monthly_base")
-    if ins.total_monthly is None or not base:
-        return None, "待补充"
-    ratio = ins.total_monthly / base
-    score = _rint(_band_min(ratio, rules.report.get(
-        "insurance_score_ratio_bands", [{"min": 0.0, "score": 20}])))
-    return score, _grade(rules, "insurance", score)
-
-
-def _efficiency_module(offer: OfferInput, rules: RuleSet, ctx: OfferContext, annual_cash: float | None) -> EfficiencyModule:
-    weekly = _num(offer, "weekly_work_hours")
-    days = _num(offer, "work_days_per_week") or 5.0
-    hourly = daily = idle = None
-    if annual_cash is not None and weekly and weekly > 0:
-        hourly = annual_cash / (weekly * 52.0)
-        daily_hours = weekly / days if days > 0 else None
-        if daily_hours:
-            daily = hourly * daily_hours
-        idle_hours = _num(offer, "daily_idle_hours")
-        if idle_hours is not None and daily_hours:
-            # 摸鱼时长 ÷ 日均在岗时长；80% 封顶——数值越高越「爽」，
-            # 但工作严重不饱和时比例会失真，不设上限会把展示值算爆。
-            idle = _clamp(idle_hours / daily_hours, 0.0, 0.8)
-    score = None if hourly is None else _rint(_band_min(hourly, rules.report.get(
-        "hourly_score_bands", [{"min": 0, "score": 20}])))
-    return EfficiencyModule(
-        annual_cash=annual_cash,
-        # 展示值与前端 Math.round 同为 half-up：统一用 _rint，不用银行家舍入
-        hourly=_rint(hourly) if hourly is not None else None,
-        daily=_rint(daily) if daily is not None else None,
-        idle_ratio=round(idle, 4) if idle is not None else None,
-        score=score, grade=_grade(rules, "efficiency", score),
-    )
-
+# ── 买房模块 ────────────────────────────────────────────────────
 
 def _housing_module(
     offer: OfferInput, rules: RuleSet, ctx: OfferContext,
@@ -577,276 +482,3 @@ def _housing_module(
         grade="不适用" if intent_excluded else _grade(rules, "housing", score),
     )
 
-
-def _living_module(rules: RuleSet, monthly_after_tax: float | None, ctx: OfferContext) -> LivingModule:
-    """模块 5 生活水平（2026-10 重定义口径）：
-    收入倍数 = 月均到手 ÷ 当地平均工资（全口径社平 = 社保基数上限 ÷ 3）；
-    实际购买力 = 月均到手 ÷ 当地物价系数（城市生活成本估算 ÷ 全国基准，全国平均 = 1）；
-    舒适线 = 当地平均工资 × 物价系数 × 1.5，舒适距离 = 月均到手 − 舒适线（可为负）。
-    城市未填/不在 universe 时按全国平均口径兜底（工资 8,000、物价系数 1.0，
-    舒适线 12,000）——数值方向正确但可能有偏差，city_pending 标记仍会展示。"""
-    cfg = rules.report.get("living", {})
-    nat_wage = float(cfg.get("national_avg_wage_month", 8000.0))
-    nat_baseline = float(cfg.get("national_baseline_cost_month", 3000.0))
-    comfort_factor = float(cfg.get("comfort_wage_multiple", 1.5))
-    baseline = float(ctx.city.get("living", {}).get("baseline_cost_month", 0.0))
-    base_max = float((ctx.city.get("base_bounds") or {}).get("max", 0.0))
-    avg_wage = base_max / 3.0 if base_max > 0 else nat_wage
-    price_coef = baseline / nat_baseline if baseline > 0 else 1.0
-    if monthly_after_tax is None:
-        return LivingModule()
-    multiple = monthly_after_tax / avg_wage
-    score = _rint(_band_min(multiple, rules.report.get(
-        "living_multiple_bands", [{"min": 0, "score": 25}])))
-    return LivingModule(
-        income_multiple=round(multiple, 2),
-        purchasing_power=round(monthly_after_tax / price_coef, 2),
-        comfort_gap=round(monthly_after_tax - avg_wage * price_coef * comfort_factor, 2),
-        score=score, grade=_grade(rules, "living", score),
-    )
-
-
-# ── 模块 6-8 ────────────────────────────────────────────────────
-
-def _development_module(offer: OfferInput, rules: RuleSet, ctx: OfferContext) -> DevelopmentModule:
-    cfg = rules.report.get("development", {})
-    axes: dict[str, float] = {}
-    city_axis = cfg.get("city_axis", {})
-    tier = ctx.city.get("tier_score")
-    if city_axis.get("label") and tier is not None:
-        axes[str(city_axis["label"])] = float(tier)
-    for axis in cfg.get("axes", []):
-        label = str(axis["label"])
-        mapping = cfg.get("maps", {}).get(axis["field"])
-        if mapping is not None:
-            # 枚举轴：「不清楚」等取值在映射内给中性分；未作答则整轴缺席
-            v = _ordinal(mapping, _text(offer, axis["field"]))
-            if v is not None:
-                axes[label] = float(v)
-            continue
-        numeric = axis.get("numeric")
-        raw = _num(offer, axis["field"])
-        if raw is not None and numeric:
-            lo, hi = float(numeric["min"]), float(numeric["max"])
-            axes[label] = _clamp((raw - lo) / (hi - lo) * 100.0)
-        elif raw is not None:
-            axes[label] = _clamp(raw)
-    score = _avg(list(axes.values()))
-    return DevelopmentModule(
-        axes={k: _rint(v) for k, v in axes.items()},
-        score=_rint(score) if score is not None else None,
-        grade=_grade(rules, "development", score),
-    )
-
-
-def _stability_module(offer: OfferInput, rules: RuleSet) -> StabilityModule:
-    cfg = rules.report.get("stability", {})
-    components: dict[str, float | str] = {}
-    weighted: list[tuple[float, float]] = []
-    for comp in cfg.get("components", []):
-        label = str(comp["label"])
-        mapping = cfg.get("maps", {}).get(comp.get("field", ""))
-        if mapping is not None:
-            v = _ordinal(mapping, _text(offer, comp["field"]))
-        else:
-            raw = _num(offer, comp.get("field", ""))
-            v = None if raw is None else _band_max(raw, comp.get("bands", [{"max": None, "score": 30}]))
-        if v is None:
-            components[label] = "待补充"
-            continue
-        components[label] = round(float(v), 1)
-        weighted.append((float(comp["weight"]), float(v)))
-    penalty = float(cfg.get("outsourced_penalty", 25))
-    outsourced = _fact(offer, "is_outsourced")
-    if outsourced is True:
-        components["外包折减"] = f"-{penalty:g} 分"
-    else:
-        components["外包折减"] = "未触发"
-    if weighted:
-        w_sum = sum(w for w, _ in weighted)
-        score = _clamp(sum(w * s for w, s in weighted) / w_sum - (penalty if outsourced is True else 0.0))
-    else:
-        score = None
-    return StabilityModule(
-        components=components,
-        score=_rint(score) if score is not None else None,
-        grade=_grade(rules, "stability", score),
-    )
-
-
-def _health_module(offer: OfferInput, rules: RuleSet) -> HealthModule:
-    """扣分制。填了不吃亏：映射项未作答按 missing_score 中性扣分；
-    数值型来源（工时/通勤）缺失时把缺失当健康会虚高，模块整体待补充。"""
-    cfg = rules.report.get("health", {})
-    deductions: dict[str, float] = {}
-    pending = False
-    for item in cfg.get("deductions", []):
-        label = str(item["label"])
-        mapping = cfg.get("maps", {}).get(item.get("source", ""))
-        if mapping is not None:
-            v = _ordinal(mapping, _text(offer, item["source"]))
-            if v is None:
-                v = item.get("missing_score")
-        else:
-            raw = _numeric_deduction(offer, item)
-            v = None if raw is None else _band_max(
-                raw, item.get("bands", [{"max": None, "score": 0}]))
-        if v is None:
-            pending = True
-            continue
-        deductions[label] = round(float(v), 1)
-    if pending:
-        return HealthModule(deductions=deductions)
-    cost = _rint(sum(deductions.values())) if deductions else None
-    main = None
-    if deductions:
-        top = max(deductions.items(), key=lambda kv: kv[1])
-        main = top[0] if top[1] > 0 else None
-    health_score = None if cost is None else _rint(_clamp(100.0 - cost))
-    # 等级按损耗分（cost）从轻到重分档：低损耗 / 中 / 高 / 极高
-    if cost is None:
-        grade = "待补充"
-    else:
-        grade = _band_max_label(
-            cost,
-            rules.report.get("health", {}).get(
-                "grade_bands", [{"max": None, "label": "极高"}]
-            ),
-        )
-    return HealthModule(
-        cost=cost, deductions=deductions, main_deduction=main,
-        health_score=health_score,
-        grade=grade,
-    )
-
-
-# ── 汇总 ────────────────────────────────────────────────────────
-
-def _money_score(rules: RuleSet, scores: dict[str, float | None]) -> float | None:
-    weights = rules.report.get("money_module_weights", {})
-    num = den = 0.0
-    for key, weight in weights.items():
-        s = scores.get(key)
-        if s is None:
-            continue
-        num += float(weight) * s
-        den += float(weight)
-    return _rint(num / den) if den > 1e-9 else None
-
-
-def _enum_label(rules: RuleSet, field_key: str, value: str | None) -> str | None:
-    """枚举事实的中文标签（排序卡片副标题等展示用）。"""
-    if value is None:
-        return None
-    spec = rules.fields.get(field_key) or {}
-    for option in spec.get("options", []):
-        if option.get("value") == value:
-            return str(option.get("label", value))
-    return None
-
-
-MODULE_KEYS = ("salary", "insurance", "efficiency", "housing", "living",
-               "development", "stability", "health")
-
-
-def build_report(inp: DecisionInput, rules: RuleSet) -> ReportOutputs:
-    weights = {k: float(v) for k, v in inp.preferences.weights.items()}
-    reports: list[OfferReport] = []
-
-    for offer in inp.offers:
-        ctx = _offer_context(offer, rules)
-        salary = _salary_module(offer, rules, ctx)
-        insurance = ctx.insurance
-        ins_score, ins_grade = _insurance_score(offer, rules, ctx)
-        insurance = insurance.model_copy(update={"score": ins_score, "grade": ins_grade})
-
-        recurring_cash = salary.income.annual_cash_net
-        monthly_cash = recurring_cash / 12 if recurring_cash is not None else None
-        efficiency = _efficiency_module(offer, rules, ctx, recurring_cash)
-        housing = _housing_module(offer, rules, ctx, monthly_cash, recurring_cash,
-                                  buy_intent=inp.preferences.buy_house_intent)
-        living = _living_module(rules, monthly_cash, ctx)
-        development = _development_module(offer, rules, ctx)
-        stability = _stability_module(offer, rules)
-        health = _health_module(offer, rules)
-
-        money = _money_score(rules, {
-            "salary": salary.score, "insurance": insurance.score,
-            "efficiency": efficiency.score, "housing": housing.score, "living": living.score,
-        })
-        dimension_scores: dict[str, float | None] = {
-            "compensation": money,
-            "development": development.score,
-            "stability": stability.score,
-            "wellbeing": health.health_score,
-        }
-        num = den = 0.0
-        for dim, s in dimension_scores.items():
-            w = weights.get(dim)
-            if s is None or w is None:
-                continue
-            num += w * s
-            den += w
-        overall = _rint(num / den) if den > 1e-9 else None
-
-        # 模块可算率：有评分的适用模块占比；另以原子字段覆盖率表示输入缺口。
-        module_scores = {
-            "salary": salary.score, "insurance": insurance.score,
-            "efficiency": efficiency.score, "housing": housing.score,
-            "living": living.score, "development": development.score,
-            "stability": stability.score, "health": health.health_score,
-        }
-        missing_modules = [k for k in MODULE_KEYS if module_scores[k] is None]
-        applicable = [k for k in MODULE_KEYS if not (k == "housing" and housing.grade == "不适用")]
-        completeness = _rint(100.0 * sum(module_scores[k] is not None for k in applicable) / len(applicable))
-        effective, contributions = {}, {}
-        money_weights = rules.report.get("money_module_weights", {})
-        money_den = sum(w for k, w in money_weights.items() if module_scores.get(k) is not None)
-        for key, score_value in module_scores.items():
-            dim = "compensation" if key in money_weights else "wellbeing" if key == "health" else key
-            w = weights.get(dim, 0.0) / den if den else 0.0
-            if key in money_weights:
-                w *= money_weights[key] / money_den if money_den else 0.0
-            effective[key] = w if score_value is not None else 0.0
-            contributions[key] = effective[key] * (score_value or 0.0)
-        if overall is not None:
-            contributions["rounding"] = overall - sum(contributions.values())
-
-        reports.append(OfferReport(
-            offer_id=offer.offer_id, company=offer.company, position=offer.position,
-            display_order=offer.display_order,
-            city=_text(offer, "city"),
-            employment_label=_enum_label(rules, "employment_nature",
-                                         _text(offer, "employment_nature")),
-            monthly_after_tax=salary.monthly_after_tax_avg,
-            overall_score=overall, money_score=money,
-            dimension_scores=dimension_scores,
-            completeness=completeness, missing_modules=missing_modules,
-            quality=report_quality(offer, rules, completeness),
-            effective_weights=effective, score_contributions=contributions,
-            city_data_as_of=str(ctx.city.get("as_of")) if ctx.city.get("as_of") else None,
-            city_pending=not ctx.city_ok,
-            compliance_alert=_compliance_alert(offer, ctx),
-            context_chips=_context_chips(offer, rules),
-            salary=salary, insurance=insurance, efficiency=efficiency,
-            housing=housing, living=living, development=development,
-            stability=stability, health=health,
-        ))
-
-    ranked = sorted(
-        reports,
-        key=lambda r: (r.overall_score is None, -(r.overall_score or 0.0), r.display_order),
-    )
-    ranking = [r.offer_id for r in ranked if r.overall_score is not None]
-    rank = None
-    offers = []
-    for i, r in enumerate(ranked):
-        if r.overall_score is None:
-            rank = None
-        elif i == 0 or r.overall_score != ranked[i - 1].overall_score:
-            rank = i + 1
-        offers.append(r.model_copy(update={"overall_rank": rank}))
-    return ReportOutputs(
-        weights=weights, ranking=ranking, offers=offers,
-        city_data_version=(rules.data.get("city_index") or {}).get("meta", {}).get("version"),
-    )

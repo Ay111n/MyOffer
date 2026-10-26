@@ -167,3 +167,81 @@ def test_reset_offer_keeps_slot_and_other_offer_but_removes_its_answers():
     assert benefits["offers"][oid]["status"] == "unanswered"
     stale = client.post(f"/api/v1/sessions/{sid}/offers/{oid}/reset", json={"version": before["version"]})
     assert stale.status_code == 409
+
+
+# ── 身份改名（company/position）────────────────────────────────
+
+def test_patch_rename_only_bumps_version_without_new_snapshot():
+    client, sid = _client_with_session()
+    offers = _list_offers(client, sid)
+    oid = offers[0]["offer_id"]
+    seq_before = client.get(f"/api/v1/sessions/{sid}").json()["data"]["latest_snapshot_seq"]
+
+    r = client.patch(f"/api/v1/sessions/{sid}/offers/{oid}", json={
+        "version": offers[0]["version"], "company": "字节跳动", "position": "后端开发",
+    })
+    assert r.status_code == 200, r.text
+    data = r.json()["data"]
+    assert data["company"] == "字节跳动"
+    assert data["position"] == "后端开发"
+    assert data["version"] == offers[0]["version"] + 1
+    # 改名不影响评分：不重算、不新增快照
+    seq_after = client.get(f"/api/v1/sessions/{sid}").json()["data"]["latest_snapshot_seq"]
+    assert seq_after == seq_before
+
+    # 改名清岗位：position 传空串
+    r2 = client.patch(f"/api/v1/sessions/{sid}/offers/{oid}", json={
+        "version": data["version"], "position": ""})
+    assert r2.status_code == 200, r2.text
+    assert r2.json()["data"]["position"] == ""
+    assert r2.json()["data"]["company"] == "字节跳动"
+
+
+def test_patch_rename_same_identity_is_idempotent():
+    client, sid = _client_with_session()
+    offer = _list_offers(client, sid)[0]
+    r = client.patch(f"/api/v1/sessions/{sid}/offers/{offer['offer_id']}", json={
+        "version": offer["version"], "company": "Offer A"})
+    assert r.status_code == 200, r.text
+    assert r.json()["data"]["version"] == offer["version"]
+
+
+def test_patch_rename_blank_company_rejected():
+    client, sid = _client_with_session()
+    offer = _list_offers(client, sid)[0]
+    for blank in ["", "   "]:
+        r = client.patch(f"/api/v1/sessions/{sid}/offers/{offer['offer_id']}", json={
+            "version": offer["version"], "company": blank})
+        assert r.status_code == 422, r.text
+        assert r.json()["error"]["code"] == "invalid_company"
+    # 被拒后名称与版本未动
+    now = _list_offers(client, sid)[0]
+    assert now["company"] == "Offer A" and now["version"] == offer["version"]
+
+
+def test_patch_rename_in_results_phase_keeps_phase():
+    client, sid = _client_with_session()
+    assert client.post(f"/api/v1/sessions/{sid}/questions/stop").status_code == 200
+    offer = _list_offers(client, sid)[0]
+    r = client.patch(f"/api/v1/sessions/{sid}/offers/{offer['offer_id']}", json={
+        "version": offer["version"], "company": "美团", "position": "算法"})
+    assert r.status_code == 200, r.text
+    # 纯改名不把用户从结果页踢回填写页
+    phase = client.get(f"/api/v1/sessions/{sid}").json()["data"]["phase"]
+    assert phase == "results"
+
+
+def test_patch_rename_with_facts_takes_snapshot_path():
+    client, sid = _client_with_session()
+    offer = _list_offers(client, sid)[0]
+    r = client.patch(f"/api/v1/sessions/{sid}/offers/{offer['offer_id']}", json={
+        "version": offer["version"], "company": "快手",
+        "facts": [{"field_key": "monthly_base", "value": 21000}]})
+    assert r.status_code == 200, r.text
+    data = r.json()["data"]
+    assert data["company"] == "快手"
+    assert data["facts"]["monthly_base"]["value"] == 21000
+    # 混合改名 + 事实变更：走事实路径，产生新快照
+    assert r.json()["decision"]["snapshot_seq"] >= 1
+    phase = client.get(f"/api/v1/sessions/{sid}").json()["data"]["phase"]
+    assert phase == "completion"

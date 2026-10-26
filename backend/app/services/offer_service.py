@@ -129,6 +129,20 @@ def list_offers(db: Session, session: DecisionSession) -> list[OfferResource]:
     return [_offer_resource(o, _offer_facts(db, o.id)) for o in offers]
 
 
+def _resolve_identity_patch(body: OfferPatchRequest) -> tuple[str | None, str | None] | None:
+    """校验并返回身份改名 (company, position)；各项 None=未提供，position 空串=清除。
+
+    company 提供 strip 后不得为空（标签与报告页靠它做主标识）。
+    完全未携带改名时返回 None。"""
+    if body.company is None and body.position is None:
+        return None
+    company = body.company.strip() if body.company is not None else None
+    if company == "":
+        raise _unprocessable("invalid_company", "公司名称不能为空")
+    position = body.position.strip() if body.position is not None else None
+    return company, position
+
+
 def patch_offer(
     db: Session, session: DecisionSession, oid: UUID, body: OfferPatchRequest, rules: RuleSet
 ) -> tuple[OfferResource, DecisionEcho]:
@@ -142,17 +156,28 @@ def patch_offer(
             {"current_version": offer.version},
         )
 
+    identity = _resolve_identity_patch(body)
     existing = {f.field_key: f for f in _offer_facts(db, offer.id)}
     facts_changed = False
     for patch in body.facts:
         facts_changed = _apply_fact_patch(db, rules, offer, existing, patch) or facts_changed
 
-    changed = facts_changed
+    identity_changed = identity is not None and (
+        (identity[0] is not None and identity[0] != offer.company)
+        or (identity[1] is not None and identity[1] != offer.position)
+    )
+    if identity is not None:
+        if identity[0] is not None:
+            offer.company = identity[0]
+        if identity[1] is not None:
+            offer.position = identity[1]
+
+    changed = facts_changed or identity_changed
     if changed:
         offer.version += 1
-    else:
-        # PATCH 只携带当前版本、没有实际变更时保持幂等：不新增快照，
-        # 也不把用户已经查看过的结果错误地重新打开。
+    if not facts_changed:
+        # 改名或纯幂等 PATCH 都不重算：改名不影响评分，也不该把用户
+        # 已经在看的报告重新打开回填写页；无实际变更时保持幂等不新增快照。
         db.commit()
         db.refresh(offer)
         return _offer_resource(offer, _offer_facts(db, offer.id)), latest_echo(db, session)

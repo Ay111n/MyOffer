@@ -1,4 +1,5 @@
 """独立试算与报告恢复。试算不写事实、偏好或快照；恢复只采用校验后的输入。"""
+import math
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -6,7 +7,7 @@ from sqlalchemy import delete
 
 from app.domain.contracts import RawFactInput
 from app.models import Offer, RawFact, UserPreference
-from app.schemas import ReportScenarioRequest
+from app.schemas import ParitySolution, ReportScenarioRequest, ReportScenarioSolveRequest
 from app.services.fact_validation import normalize_fact_value, validate_fact_value
 from app.services.pipeline import compute_snapshot
 from app.services.preference_service import normalize_weights
@@ -24,6 +25,8 @@ def scenario(snapshot, body: ReportScenarioRequest, rules):
         raise invalid("试算对象不在该报告中")
     facts = dict(offer.facts)
     updates = {}
+    if body.monthly_base is not None:
+        updates["monthly_base"] = body.monthly_base
     if body.bonus_factor != 1:
         method = facts.get("annual_bonus_method")
         key = "annual_bonus_months" if method and method.value == "multiple" else "annual_bonus_value"
@@ -44,6 +47,62 @@ def scenario(snapshot, body: ReportScenarioRequest, rules):
         preferences = preferences.model_copy(update={"weights": normalize_weights(rules, body.weights)})
     return compute_snapshot(session_id=snapshot.session_id, trigger_type="scenario",
                             inp=inp.model_copy(update={"offers": offers, "preferences": preferences}), rules=rules)
+
+
+# ── 反解追平点 ─────────────────────────────────────────────────
+
+_SOLVE_PRECISION = 1.0    # 二分收敛精度（元）
+_SOLVE_STEP = 100.0       # 展示值向上取整到百元（谈判口径更可读）
+
+
+def solve_parity(snapshot, body: ReportScenarioSolveRequest, rules) -> ParitySolution:
+    """反解：目标 Offer 的月薪调到多少，展示综合分追平当前第一名。
+
+    展示分对月薪近似单调不降（现金/购买力上升占主导；评分口径已中和
+    少缴社保的现金增量），0.1 粒度的取整平台不影响 >= 判定下的二分。
+    二分只保证找到「一个」追平点并在单调段内最小；展示值向上取整到
+    百元确保按报出的数字谈不会少算。字段上界内仍追不平 → required=None。"""
+    rows = snapshot.outputs.offers
+    target = next((o for o in rows if o.offer_id == body.offer_id), None)
+    if target is None:
+        raise invalid("试算对象不在该报告中")
+    scored = [o for o in rows if o.overall_score is not None]
+    if len(scored) < 2 or target.overall_score is None:
+        raise invalid("报告尚未形成完整排名，无法反解追平点")
+    leader = max((o for o in scored if o.offer_id != target.offer_id),
+                 key=lambda o: o.overall_score)
+    leader_score = float(leader.overall_score)
+    if float(target.overall_score) >= leader_score:
+        raise invalid("该 Offer 已并列或领先，无需追平")
+
+    src = next((o for o in snapshot.inputs.offers if o.offer_id == body.offer_id), None)
+    base_fact = src.facts.get("monthly_base") if src is not None else None
+    if base_fact is None or not isinstance(base_fact.value, (int, float)) or isinstance(base_fact.value, bool):
+        raise invalid("该 Offer 尚无可用于反解的月薪数据")
+    current = float(base_fact.value)
+
+    def tied(value: float) -> bool:
+        trial = scenario(snapshot, ReportScenarioRequest(
+            snapshot_seq=body.snapshot_seq, offer_id=body.offer_id, monthly_base=value), rules)
+        row = next(o for o in trial.outputs.offers if o.offer_id == body.offer_id)
+        return float(row.overall_score) >= leader_score
+
+    max_base = float((rules.fields.get("monthly_base") or {}).get("max") or 1_000_000)
+    max_base = min(max_base, 1_000_000)  # 与请求 schema 守卫一致
+    common = dict(lever="monthly_base", target_id=target.offer_id, leader_id=leader.offer_id,
+                  leader_score=leader_score, target_current_score=float(target.overall_score),
+                  current_value=current)
+    if not tied(max_base):
+        return ParitySolution(**common, required_value=None, delta=None)
+    lo, hi = current, max_base
+    while hi - lo > _SOLVE_PRECISION:
+        mid = (lo + hi) / 2
+        if tied(mid):
+            hi = mid
+        else:
+            lo = mid
+    required = min(max_base, math.ceil(hi / _SOLVE_STEP) * _SOLVE_STEP)
+    return ParitySolution(**common, required_value=required, delta=round(required - current, 2))
 
 
 def validate_restore(inp, rules):

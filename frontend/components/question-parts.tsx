@@ -282,6 +282,14 @@ function fieldUnit(fieldKey: string, draft: Record<string, FieldDraft>): string 
   return FIELD_UNIT[fieldKey];
 }
 
+/** 年终奖方式选「倍数」时，同一输入框承载的是月薪倍数而非金额，标签随之切换。 */
+function fieldLabelText(fieldKey: string, draft: Record<string, FieldDraft>): string {
+  if (fieldKey === "annual_bonus_value" && draft.annual_bonus_method?.value === "multiple") {
+    return "年终奖倍数";
+  }
+  return fieldLabel(fieldKey);
+}
+
 function fieldDisplayValue(fieldKey: string, value: unknown): string {
   if (typeof value !== "number") return value === undefined || value === null ? "" : String(value);
   const scale = FIELD_STORAGE_UNITS_PER_DISPLAY_UNIT[fieldKey] ?? 1;
@@ -550,7 +558,7 @@ function FieldControl({
   const isNotApplicable = value?.status === "not_applicable";
   const options = field.options ?? [];
   const unit = fieldUnit(field.field_key, draft);
-  const label = fieldLabel(field.field_key);
+  const label = fieldLabelText(field.field_key, draft);
   // 默认值只作占位符提示（不代填）：用户不填 = 不提交，引擎按缺失口径处理
   const dv = field.default_value;
   const placeholder = REQUIRED_FIELDS.has(field.field_key)
@@ -731,7 +739,7 @@ function OfferColumnBase({ qkey, oid, name, fields: fieldsIn, draft, onDraftChan
               className="form-row rounded-lg"
             >
               <span className="form-label">
-                {fieldLabel(primary.field_key)}
+                {fieldLabelText(primary.field_key, effectiveDraft)}
                 {REQUIRED_FIELDS.has(primary.field_key) && <span className="ml-0.5 text-rose-500">*</span>}
               </span>
               <div className="form-controls">

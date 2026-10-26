@@ -1,5 +1,6 @@
 import createClient from 'openapi-fetch'; import type {paths} from './schema';
 import { useFlowStore } from '@/stores/flow-store';
+import { clearLocalWorkspace } from '@/stores/flow-store';
 export const api=createClient<paths>({baseUrl:'',credentials:'include'});
 
 /** 清掉当前页面里的失效工作区；非首页整页跳转到新的填写流程。 */
@@ -12,6 +13,9 @@ function discardLocalSession(): void {
   } catch {
     // 存储不可用：清状态照常进行（内存态仍会重置）
   }
+  // 一并清掉本机持久痕迹（跨标签会话记录 + 未提交草稿），避免回到首页后
+  // 又把已失效会话的草稿恢复出来
+  clearLocalWorkspace();
   useFlowStore.getState().enterSession(null);
   if (window.location.pathname !== "/") window.location.assign("/");
 }

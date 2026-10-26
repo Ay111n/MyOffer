@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-# v0.7 决策维度（键与价值观问卷/report.yaml decision_dimensions 一致）；
+# 决策维度（键与价值观问卷/report.yaml decision_dimensions 一致）；
 # 历史快照中的维度字段声明为 str，旧 key 仍可加载回看。
 DimensionKey = Literal["economic", "growth", "experience"]
 DIMENSION_KEYS: tuple[str, ...] = ("economic", "growth", "experience")
@@ -39,7 +39,7 @@ class UserPreferenceInput(FrozenModel):
 class DecisionInput(FrozenModel):
     offers: list[OfferInput]; preferences: UserPreferenceInput
 
-# ── v0.7 八模块报告输出 ─────────────────────────────────────────
+# ── 报告输出契约（v5 三维评分）──────────────────────────────────
 class MonthSalaryRow(FrozenModel):
     """每月到手工资表一行（累计预扣法）。"""
     month: int; tax_pre: float; tax: float; after_tax: float
@@ -61,19 +61,6 @@ class IncomeBreakdown(FrozenModel):
     recurring_total: float | None = None
     entry_tax_method: str = "并入综合所得，按入职年度与常规年度总税差估算"
     assumptions: list[str] = Field(default_factory=list)
-
-
-class ReportQuality(FrozenModel):
-    field_coverage: int = 0
-    answered_fields: int = 0
-    applicable_fields: int = 0
-    module_coverage: int = 0
-    source_counts: dict[str, int] = Field(default_factory=dict)
-    uncertain_fields: list[str] = Field(default_factory=list)
-    missing_fields: list[str] = Field(default_factory=list)
-    estimated_items: list[str] = Field(default_factory=list)
-    priority_fields: list[str] = Field(default_factory=list)
-    provisional: bool = True
 
 
 class SalaryModule(FrozenModel):
@@ -106,15 +93,6 @@ class InsuranceModule(FrozenModel):
     score: float | None = None
     grade: str = "待补充"
 
-class EfficiencyModule(FrozenModel):
-    """模块 3 赚钱效率：时薪 / 日薪 / 摸鱼收益率。"""
-    annual_cash: float | None = None    # 常规年度税后现金，不含公积金、实物福利和入职收入
-    hourly: float | None = None
-    daily: float | None = None
-    idle_ratio: float | None = None     # 摸鱼收益率（0-1，每日摸鱼÷日均在岗，封顶 0.8）
-    score: float | None = None
-    grade: str = "待补充"
-
 class HousingModule(FrozenModel):
     """模块 4 买房预期：攒首付年限 / 月供收入比。"""
     house_total: float | None = None
@@ -123,46 +101,16 @@ class HousingModule(FrozenModel):
     monthly_payment: float | None = None
     payment_income_ratio: float | None = None
     welfare_annual: float | None = None   # 年补贴（购买力口径）
-    signing_bonus: float | None = None    # 安家费（一次性）
+    signing_bonus: float | None = None   # 安家费（一次性）
     score: float | None = None
-    grade: str = "待补充"
-
-class LivingModule(FrozenModel):
-    """模块 5 生活水平：收入倍数 / 实际购买力 / 舒适距离。"""
-    income_multiple: float | None = None     # 月均到手 ÷ 当地平均工资（未识别城市按全国 8,000 兜底）
-    purchasing_power: float | None = None    # 月均到手 ÷ 当地物价系数（折算成全国平均物价下的购买额）
-    comfort_gap: float | None = None         # 月均到手 − 舒适线（平均工资×物价系数×1.5，可为负）
-    score: float | None = None
-    grade: str = "待补充"
-
-class DevelopmentModule(FrozenModel):
-    """模块 6 发展水平：八轴雷达 + 综合分。"""
-    axes: dict[str, float] = Field(default_factory=dict)   # 轴中文标签 → 0-100
-    score: float | None = None
-    grade: str = "待补充"
-
-class StabilityModule(FrozenModel):
-    """模块 7 稳定性：组件维度分 + 外包折减 + 综合分。"""
-    components: dict[str, float | str] = Field(default_factory=dict)  # 组件中文标签 → 分或「未触发」
-    score: float | None = None
-    grade: str = "待补充"
-
-class HealthModule(FrozenModel):
-    """模块 8 健康损耗：扣分制，分数越低越好。"""
-    cost: float | None = None                 # 损耗分
-    deductions: dict[str, float] = Field(default_factory=dict)  # 扣分项 → 扣分
-    main_deduction: str | None = None         # 主要扣分项
-    health_score: float | None = None         # 100 − 损耗分（进综合评分）
     grade: str = "待补充"
 
 class OfferReport(FrozenModel):
     offer_id: UUID; company: str; position: str; display_order: int
     city: str | None = None              # 工作地点（排序卡片副标题）
-    employment_label: str | None = None  # 工作性质中文标签（排序卡片副标题）
     monthly_after_tax: float | None = None    # 综合排序的展示数字：年平均每月到手
     overall_score: float | None = None
     overall_rank: int | None = None
-    money_score: float | None = None          # 钱 = 模块 1-5 加权综合
     dimension_scores: dict[str, float | None] = Field(default_factory=dict)  # 维度键 → 分
     effective_weights: dict[str, float] = Field(default_factory=dict)
     score_contributions: dict[str, float] = Field(default_factory=dict)
@@ -173,21 +121,11 @@ class OfferReport(FrozenModel):
     missing_core: list[str] = Field(default_factory=list)
     known_optional: dict[str, Any] = Field(default_factory=dict)
     input_values: dict[str, Any] = Field(default_factory=dict)
-    quality: ReportQuality = Field(default_factory=ReportQuality)
     city_data_as_of: str | None = None
-    completeness: int = 0                     # 数据完整度（8 模块已得分占比，%）
-    missing_modules: list[str] = Field(default_factory=list)  # 未得分模块键（salary/.../health）
-    city_pending: bool = False                # 城市参数缺失/不在 universe（城市类模块待补充）
-    compliance_alert: bool = False            # 社保/公积金按最低基数或不缴纳的合规提示（不参与评分）
-    context_chips: list[str] = Field(default_factory=list)    # 不计分的个人情境参考（离家远近/城市好感/工作环境）
+    compliance_alert: bool = False          # 社保/公积金按最低基数或不缴纳的合规提示（不参与评分）
     salary: SalaryModule = Field(default_factory=SalaryModule)
     insurance: InsuranceModule = Field(default_factory=InsuranceModule)
-    efficiency: EfficiencyModule = Field(default_factory=EfficiencyModule)
     housing: HousingModule = Field(default_factory=HousingModule)
-    living: LivingModule = Field(default_factory=LivingModule)
-    development: DevelopmentModule = Field(default_factory=DevelopmentModule)
-    stability: StabilityModule = Field(default_factory=StabilityModule)
-    health: HealthModule = Field(default_factory=HealthModule)
 
 class ReportOutputs(FrozenModel):
     weights: dict[str, float] = Field(default_factory=dict)   # 决策维度权重（问卷产出）

@@ -1,4 +1,4 @@
-.PHONY: backend frontend ai-install ai-test test test-unit lint openapi gen-api e2e regression
+.PHONY: backend frontend ai-install ai-test test test-unit lint openapi gen-api e2e regression city-staleness
 
 # 使用项目开发环境，避免系统 Python 未安装 ruff 或全局 PATH 未激活 venv。
 ifeq ($(OS),Windows_NT)
@@ -24,7 +24,11 @@ test:
 
 # 规则引擎纯单元/金标准（只加载 YAML 规则，不启动 FastAPI / 进程内 DB，适合快速回归）
 test-unit:
-	cd backend && pytest -q tests/test_report_engine.py tests/test_rules_invariants.py tests/test_fact_value_bounds.py
+	cd backend && pytest -q tests/test_three_dimension.py tests/test_rules_invariants.py tests/test_fact_value_bounds.py
+
+# 城市参考数据新旧度清单（与启动警告同口径；复核流程见 tools/city-data/MAINTENANCE.md）
+city-staleness:
+	backend/$(BACKEND_PYTHON) tools/city-data/check_staleness.py
 
 lint:
 	cd backend && $(BACKEND_PYTHON) -m ruff check app tests

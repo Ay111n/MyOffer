@@ -21,6 +21,8 @@ _FOREIGN_BODIES = {
                         "stability": 1, "wellbeing": 1}},
     "PATCH_DD": {"status": "done"},
     "POST_ANSWERS": {"answers": [{"offer_id": None, "fields": []}]},
+    "POST_SCENARIO": {"snapshot_seq": 1,
+                      "offer_id": "00000000-0000-0000-0000-00000000000a"},
     "POST_TELEMETRY": {"events": [{"event_type": "step_enter",
                                    "payload": {"step": "s"}}]},
 }
@@ -43,6 +45,8 @@ _ENDPOINTS = [
     ("GET", "/api/v1/sessions/{sid}/result", None),
     ("GET", "/api/v1/sessions/{sid}/results/history", None),
     ("GET", "/api/v1/sessions/{sid}/results/1", None),
+    ("POST", "/api/v1/sessions/{sid}/report/scenario", "POST_SCENARIO"),
+    ("POST", "/api/v1/sessions/{sid}/report/scenario/solve", "POST_SCENARIO"),
     ("GET", "/api/v1/sessions/{sid}/due-diligence", None),
     ("PATCH", "/api/v1/sessions/{sid}/due-diligence/00000000-0000-0000-0000-0000000000dd",
      "PATCH_DD"),

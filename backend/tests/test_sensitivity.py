@@ -78,3 +78,31 @@ def test_handles_skewed_current_weights(weights):
     view = compute_sensitivity([a, b], weights)
     assert view is not None
     assert view.status in {"stable", "steady", "moderate", "fragile", "tie"}
+
+
+# ── 二维全向 margin（覆盖两维同动的翻转，单轴扫描看不见）──────────────
+
+def test_dominant_and_tie_have_no_margin():
+    assert compute_sensitivity([row(90, 90, 90), row(40, 40, 40)], W).margin is None
+    assert compute_sensitivity([row(60, 60, 60), row(60, 60, 60)], W).margin is None
+
+
+def test_margin_never_exceeds_nearest_axis_flip_distance():
+    a, b = row(80, 60, 40), row(40, 60, 79)
+    view = compute_sensitivity([a, b], W)
+    assert view.margin is not None and view.nearest is not None
+    axis = abs(view.nearest.flip_weight - view.nearest.current_weight)
+    # 网格步长 0.5% 的容差内，全向距离不会比单轴更远
+    assert view.margin <= axis + 0.005
+
+
+def test_two_dimension_flip_tightens_status_beyond_axis_only_view():
+    # 边界 x ≈ 3.61e：单轴最近翻转距离 ≈ 21.5 个百分点（旧口径判 steady），
+    # 但「经济降 + 体验升」两维同动只要 ≈ 18.9 个百分点即可翻转——
+    # 全向 margin 应把它如实归为 moderate
+    a, b = row(95, 60, 55), row(30, 60, 73)
+    view = compute_sensitivity([a, b], W)
+    assert view.status == "moderate"
+    assert view.margin is not None and 0.15 < view.margin < 0.21
+    axis = min(abs(f.flip_weight - f.current_weight) for f in view.flips)
+    assert axis > 0.20  # 对照：仅凭单轴扫描会误判为比较稳

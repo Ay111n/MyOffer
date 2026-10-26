@@ -1,18 +1,26 @@
 """排名对「偏好权重」的敏感性。
 
-只回答一个问题：如果用户对三个维度的看重程度和现在不同，排名第一会不会换人？
+回答两个问题：
+1. 单轴：某个维度的权重调到多少，第一名会换人？（给出可操作的翻转点文案）
+2. 全向：当前权重离「第一名易主」的边界还有多远？（二维单纯形网格全扫，
+   覆盖「经济降一点 + 体验升一点」这类两维同动的翻转，单轴扫描看不见）
 
 做法（纯函数，不读库、不重新评估输入）：
   - 取快照里每份 Offer 已算好的三维分 `dimension_scores`；
-  - 逐个维度，把该维度的权重从当前值向两侧扫描（0.5% 一步，范围与偏好界面一致：
-    每维 5%–90%）；另外两维按「各自超出 5% 下限的部分」成比例补齐到 100%，
-    与前端手动调权重时的补齐规则相同；
-  - 综合分沿用排名口径：加权和 + 1e-9 后保留一位小数，展示分相同即并列；
-  - 当前第一名不再是唯一第一名的最近权重，就是该维度在该方向上的「翻转点」（上调/下调各至多一个）。
+  - 单轴：逐维度把权重向两侧扫描（0.5% 一步，范围与偏好界面一致 5%–90%），
+    另外两维按「各自超出下限的部分」成比例补齐，与前端手动调权重一致；
+  - 全向：在 (economic, growth) 网格上枚举全部可行权重组合（experience 由
+    归一约束确定），标记「第一名不再是唯一第一」的网格点，取当前权重到
+    这些点的最短总变差距离（TV = 半 L1：把 δ 个百分点从一个维度挪到另一个
+    维度，TV 恰为 δ，与单轴翻转点的百分点口径一致）；
+  - 综合分沿用排名口径：加权和 + 1e-9 后保留一位小数，展示分相同即并列。
 
-分级只用于措辞，阈值集中在下面的常量里。
+status 分级以「到边界的最短距离」为准（全向优先，单轴兜底）；
+阈值集中在常量里，只用于措辞。
 """
 from __future__ import annotations
+
+from functools import lru_cache
 
 from app.schemas import SensitivityFlip, SensitivityView
 
@@ -20,7 +28,9 @@ DIMENSIONS = ("economic", "growth", "experience")
 WEIGHT_MIN = 0.05
 WEIGHT_MAX = 0.90
 STEP = 0.005
-# 最近翻转点离当前权重的距离（权重的绝对值，0.1 = 10 个百分点）
+# 全向网格步长与单轴一致；直线边界下网格精度 ≈ ±0.5 个百分点
+GRID_STEP = 0.005
+# 到翻转边界的最短距离（总变差，0.1 = 在维度间对调 10 个百分点）
 FRAGILE_BELOW = 0.10
 MODERATE_BELOW = 0.20
 
@@ -43,6 +53,40 @@ def _winners(scores: dict[object, dict[str, float]], weights: dict[str, float]) 
     return [oid for oid, value in shown.items() if value == best]
 
 
+@lru_cache(maxsize=512)
+def _plane_margin_cached(
+    leader_scores: tuple[float, float, float],
+    other_scores: tuple[tuple[float, float, float], ...],
+    current: tuple[float, float, float],
+) -> float | None:
+    """当前权重到「第一名易主/并列」网格点的最短总变差距离。
+
+    None = 整个可选权重平面内第一名都保持唯一第一（比单轴扫描更强的 stable 证据）。
+    快照不可变、输入纯数值——按值缓存，重复查看同一报告零重算。"""
+    le, lg, lx = leader_scores
+    ce, cg, cx = current
+    steps = int(round((WEIGHT_MAX - WEIGHT_MIN) / GRID_STEP))
+    best: float | None = None
+    for i in range(steps + 1):
+        e = WEIGHT_MIN + i * GRID_STEP
+        for j in range(steps + 1):
+            g = WEIGHT_MIN + j * GRID_STEP
+            x = 1.0 - e - g
+            if x < WEIGHT_MIN - 1e-9 or x > WEIGHT_MAX + 1e-9:
+                continue
+            leader_total = round(le * e + lg * g + lx * x + 1e-9, 1)
+            lost = False
+            for oe, og, ox in other_scores:
+                if round(oe * e + og * g + ox * x + 1e-9, 1) >= leader_total:
+                    lost = True
+                    break
+            if lost:
+                tv = 0.5 * (abs(e - ce) + abs(g - cg) + abs(x - cx))
+                if best is None or tv < best:
+                    best = tv
+    return best
+
+
 def compute_sensitivity(offers, weights: dict[str, float]) -> SensitivityView | None:
     """offers: OfferReport 序列；信息不足以排名（任一 Offer 无三维分）时返回 None。"""
     scores: dict[object, dict[str, float]] = {}
@@ -57,7 +101,7 @@ def compute_sensitivity(offers, weights: dict[str, float]) -> SensitivityView | 
     current = {k: float(weights[k]) for k in DIMENSIONS}
     top = _winners(scores, current)
     if len(top) != 1:
-        return SensitivityView(status="tie", leader_id=None, nearest=None, flips=[])
+        return SensitivityView(status="tie", leader_id=None, nearest=None, flips=[], margin=None)
     leader = top[0]
 
     flips: list[SensitivityFlip] = []
@@ -82,9 +126,21 @@ def compute_sensitivity(offers, weights: dict[str, float]) -> SensitivityView | 
 
     flips.sort(key=lambda f: abs(f.flip_weight - f.current_weight))
     nearest = flips[0] if flips else None
-    if nearest is None:
+
+    leader_key = tuple(scores[leader][k] for k in DIMENSIONS)
+    others_key = tuple(
+        tuple(scores[oid][k] for k in DIMENSIONS)
+        for oid in scores if oid != leader
+    )
+    margin = _plane_margin_cached(leader_key, others_key, tuple(current[k] for k in DIMENSIONS))
+
+    axis_distance = (abs(nearest.flip_weight - nearest.current_weight)
+                     if nearest is not None else None)
+    distances = [d for d in (margin, axis_distance) if d is not None]
+    if not distances:
         status = "stable"
     else:
-        distance = abs(nearest.flip_weight - nearest.current_weight)
+        distance = min(distances)
         status = "fragile" if distance < FRAGILE_BELOW else "moderate" if distance < MODERATE_BELOW else "steady"
-    return SensitivityView(status=status, leader_id=leader, nearest=nearest, flips=flips)
+    return SensitivityView(status=status, leader_id=leader, nearest=nearest, flips=flips,
+                           margin=margin if distances else None)

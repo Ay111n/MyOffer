@@ -147,6 +147,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sessions/{sid}/questions/answers/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answers Batch
+         * @description 批量提交多题草稿（「生成对比报告」路径）。
+         *
+         *     单事务逐题校验+写入、只重算一次、只落一条快照；任一题校验失败
+         *     整批拒绝（零写入），错误 details 附 question_key。单题端点保留，
+         *     供个别编辑继续使用。
+         */
+        post: operations["answers_batch_api_v1_sessions__sid__questions_answers_batch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions/{sid}/questions/{question_key}/answers": {
         parameters: {
             query?: never;
@@ -271,6 +295,52 @@ export interface paths {
         get: operations["export_report_api_v1_sessions__sid__report_export_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{sid}/report/scenario": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Scenario
+         * @description 免写入试算：在最新快照上按调整值（月薪/奖金倍数/工时/通勤）重打一次分。
+         *
+         *     只接受最新快照的 seq（防陈旧，与 AI 分析同一守卫）；scenario() 全程
+         *     不落库、不产生新快照，返回的是一次性的对比结果投影。
+         */
+        post: operations["run_scenario_api_v1_sessions__sid__report_scenario_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{sid}/report/scenario/solve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Solve Parity
+         * @description 反解追平点：目标 Offer 的月薪谈到多少能追平当前第一名。
+         *
+         *     与试算同一防陈旧守卫（只接受最新快照 seq）；内部反复调用免写入
+         *     试算二分求解，全程不落库、不产生新快照。
+         */
+        post: operations["solve_parity_api_v1_sessions__sid__report_scenario_solve_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -735,6 +805,40 @@ export interface components {
             data: components["schemas"]["AnswerData"];
             decision: components["schemas"]["DecisionEcho"];
         };
+        /** BatchAnswerData */
+        BatchAnswerData: {
+            /** Questions */
+            questions?: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+        };
+        /**
+         * BatchAnswerItem
+         * @description 单题草稿：answers 语义与单题端点完全一致（每 Offer 至多一条）。
+         */
+        BatchAnswerItem: {
+            /** Question Key */
+            question_key: string;
+            /** Answers */
+            answers: components["schemas"]["AnswerItem"][];
+        };
+        /**
+         * BatchAnswerRequest
+         * @description 多题草稿一次性提交（「生成对比报告」路径）：同一事务内逐题校验写入，
+         *     全部成功后只重算一次、只落一条快照。任一题校验失败整批拒绝（原子，
+         *     此时尚无任何写入），错误 details 附 question_key 供前端定位。
+         */
+        BatchAnswerRequest: {
+            /** Items */
+            items: components["schemas"]["BatchAnswerItem"][];
+        };
+        /** BatchAnswerResponse */
+        BatchAnswerResponse: {
+            data: components["schemas"]["BatchAnswerData"];
+            decision: components["schemas"]["DecisionEcho"];
+        };
         /**
          * DecisionEcho
          * @description 写入响应中的最新报告摘要（与结果页同一快照产出）。
@@ -767,20 +871,6 @@ export interface components {
         /** DeletedResponse */
         DeletedResponse: {
             data: components["schemas"]["DeletedResource"];
-        };
-        /** DevelopmentModuleView */
-        DevelopmentModuleView: {
-            /** Score */
-            score?: number | null;
-            /**
-             * Grade
-             * @default 待补充
-             */
-            grade: string;
-            /** Axes */
-            axes?: {
-                [key: string]: number;
-            };
         };
         /** DueDiligenceItem */
         DueDiligenceItem: {
@@ -826,22 +916,6 @@ export interface components {
             data: {
                 [key: string]: components["schemas"]["DueDiligenceItem"][];
             };
-        };
-        /** EfficiencyModuleView */
-        EfficiencyModuleView: {
-            /** Score */
-            score?: number | null;
-            /**
-             * Grade
-             * @default 待补充
-             */
-            grade: string;
-            /** Hourly */
-            hourly?: number | null;
-            /** Daily */
-            daily?: number | null;
-            /** Idle Ratio */
-            idle_ratio?: number | null;
         };
         /** FactPatch */
         FactPatch: {
@@ -916,26 +990,6 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
-        };
-        /** HealthModuleView */
-        HealthModuleView: {
-            /** Score */
-            score?: number | null;
-            /**
-             * Grade
-             * @default 待补充
-             */
-            grade: string;
-            /** Cost */
-            cost?: number | null;
-            /** Deductions */
-            deductions?: {
-                [key: string]: number;
-            };
-            /** Main Deduction */
-            main_deduction?: string | null;
-            /** Health Score */
-            health_score?: number | null;
         };
         /** HistoryItem */
         HistoryItem: {
@@ -1045,22 +1099,6 @@ export interface components {
             /** Total Monthly */
             total_monthly?: number | null;
         };
-        /** LivingModuleView */
-        LivingModuleView: {
-            /** Score */
-            score?: number | null;
-            /**
-             * Grade
-             * @default 待补充
-             */
-            grade: string;
-            /** Income Multiple */
-            income_multiple?: number | null;
-            /** Purchasing Power */
-            purchasing_power?: number | null;
-            /** Comfort Gap */
-            comfort_gap?: number | null;
-        };
         /** MetaResource */
         MetaResource: {
             /** Supported Cities */
@@ -1108,6 +1146,10 @@ export interface components {
         OfferPatchRequest: {
             /** Version */
             version: number;
+            /** Company */
+            company?: string | null;
+            /** Position */
+            position?: string | null;
             /** Facts */
             facts?: components["schemas"]["FactPatch"][];
         };
@@ -1146,21 +1188,16 @@ export interface components {
             display_order: number;
             /** City */
             city?: string | null;
-            /** Employment Label */
-            employment_label?: string | null;
             /** Monthly After Tax */
             monthly_after_tax?: number | null;
             /** Overall Score */
             overall_score?: number | null;
             /** Overall Rank */
             overall_rank?: number | null;
-            /** Money Score */
-            money_score?: number | null;
             /** Dimension Scores */
             dimension_scores?: {
                 [key: string]: number | null;
             };
-            quality?: components["schemas"]["ReportQuality"];
             /** Effective Weights */
             effective_weights?: {
                 [key: string]: number;
@@ -1200,32 +1237,13 @@ export interface components {
             /** City Data As Of */
             city_data_as_of?: string | null;
             /**
-             * Completeness
-             * @default 0
-             */
-            completeness: number;
-            /** Missing Modules */
-            missing_modules?: string[];
-            /**
-             * City Pending
-             * @default false
-             */
-            city_pending: boolean;
-            /**
              * Compliance Alert
              * @default false
              */
             compliance_alert: boolean;
-            /** Context Chips */
-            context_chips?: string[];
             salary: components["schemas"]["SalaryModuleView"];
             insurance: components["schemas"]["InsuranceModuleView"];
-            efficiency: components["schemas"]["EfficiencyModuleView"];
             housing: components["schemas"]["HousingModuleView"];
-            living: components["schemas"]["LivingModuleView"];
-            development: components["schemas"]["DevelopmentModuleView"];
-            stability: components["schemas"]["StabilityModuleView"];
-            health: components["schemas"]["HealthModuleView"];
         };
         /** OfferResetRequest */
         OfferResetRequest: {
@@ -1259,6 +1277,39 @@ export interface components {
             /** Label */
             label: string;
         };
+        /**
+         * ParitySolution
+         * @description 反解追平点：目标 Offer 的某项输入谈到多少，展示综合分追平当前第一名。
+         *     required_value=None 表示在字段上界内仅靠该杠杆无法追平。
+         */
+        ParitySolution: {
+            /**
+             * Lever
+             * @default monthly_base
+             * @constant
+             */
+            lever: "monthly_base";
+            /**
+             * Target Id
+             * Format: uuid
+             */
+            target_id: string;
+            /**
+             * Leader Id
+             * Format: uuid
+             */
+            leader_id: string;
+            /** Leader Score */
+            leader_score: number;
+            /** Target Current Score */
+            target_current_score: number;
+            /** Current Value */
+            current_value: number;
+            /** Required Value */
+            required_value?: number | null;
+            /** Delta */
+            delta?: number | null;
+        };
         /** PortableDecisionInput */
         PortableDecisionInput: {
             /** Offers */
@@ -1274,6 +1325,16 @@ export interface components {
             offer_id: string;
             /** Display Order */
             display_order: number;
+            /**
+             * Company
+             * @default
+             */
+            company: string;
+            /**
+             * Position
+             * @default
+             */
+            position: string;
             /** Facts */
             facts?: {
                 [key: string]: components["schemas"]["RawFactInput"];
@@ -1510,46 +1571,6 @@ export interface components {
             schema_version: 5;
             inputs: components["schemas"]["PortableDecisionInput"];
         };
-        /** ReportQuality */
-        ReportQuality: {
-            /**
-             * Field Coverage
-             * @default 0
-             */
-            field_coverage: number;
-            /**
-             * Answered Fields
-             * @default 0
-             */
-            answered_fields: number;
-            /**
-             * Applicable Fields
-             * @default 0
-             */
-            applicable_fields: number;
-            /**
-             * Module Coverage
-             * @default 0
-             */
-            module_coverage: number;
-            /** Source Counts */
-            source_counts?: {
-                [key: string]: number;
-            };
-            /** Uncertain Fields */
-            uncertain_fields?: string[];
-            /** Missing Fields */
-            missing_fields?: string[];
-            /** Estimated Items */
-            estimated_items?: string[];
-            /** Priority Fields */
-            priority_fields?: string[];
-            /**
-             * Provisional
-             * @default true
-             */
-            provisional: boolean;
-        };
         /** ReportRestoreRequest */
         ReportRestoreRequest: {
             /** Format */
@@ -1557,6 +1578,41 @@ export interface components {
             /** Schema Version */
             schema_version?: number | null;
             inputs?: components["schemas"]["PortableDecisionInput"] | null;
+        };
+        /** ReportScenarioRequest */
+        ReportScenarioRequest: {
+            /** Snapshot Seq */
+            snapshot_seq: number;
+            /**
+             * Offer Id
+             * Format: uuid
+             */
+            offer_id: string;
+            /** Monthly Base */
+            monthly_base?: number | null;
+            /**
+             * Bonus Factor
+             * @default 1
+             */
+            bonus_factor: number;
+            /** Weekly Work Hours */
+            weekly_work_hours?: number | null;
+            /** Commute Minutes */
+            commute_minutes?: number | null;
+            /** Weights */
+            weights?: {
+                [key: string]: number;
+            } | null;
+        };
+        /** ReportScenarioSolveRequest */
+        ReportScenarioSolveRequest: {
+            /** Snapshot Seq */
+            snapshot_seq: number;
+            /**
+             * Offer Id
+             * Format: uuid
+             */
+            offer_id: string;
         };
         /** ResultResponse */
         ResultResponse: {
@@ -1666,6 +1722,10 @@ export interface components {
             /** Annual With Welfare */
             annual_with_welfare?: number | null;
         };
+        /** ScenarioSolveResponse */
+        ScenarioSolveResponse: {
+            data: components["schemas"]["ParitySolution"];
+        };
         /**
          * SensitivityFlip
          * @description 某个维度的权重调到 flip_weight 时，当前第一名不再是唯一第一。
@@ -1695,8 +1755,10 @@ export interface components {
         };
         /**
          * SensitivityView
-         * @description 排名对偏好权重的敏感性。status：stable 调到极端也不变；steady 翻转点距当前 ≥ 20 个百分点；
-         *     moderate 10–20；fragile < 10；tie 当前就并列。
+         * @description 排名对「偏好权重」的敏感性。status：stable 整个可选权重平面内都不变；
+         *     steady 距翻转边界 ≥ 20 个百分点；moderate 10–20；fragile < 10；tie 当前就并列。
+         *     margin 是当前权重到翻转边界的最短「总变差距离」——把多少个百分点从一个
+         *     维度挪到另一个维度（二维全向扫描，不限于单轴）；stable 时为 None。
          */
         SensitivityView: {
             /**
@@ -1709,6 +1771,8 @@ export interface components {
             nearest?: components["schemas"]["SensitivityFlip"] | null;
             /** Flips */
             flips?: components["schemas"]["SensitivityFlip"][];
+            /** Margin */
+            margin?: number | null;
             /**
              * Weight Min
              * @default 0.05
@@ -1765,20 +1829,6 @@ export interface components {
         /** SessionResponse */
         SessionResponse: {
             data: components["schemas"]["SessionResource"];
-        };
-        /** StabilityModuleView */
-        StabilityModuleView: {
-            /** Score */
-            score?: number | null;
-            /**
-             * Grade
-             * @default 待补充
-             */
-            grade: string;
-            /** Components */
-            components?: {
-                [key: string]: unknown;
-            };
         };
         /** StopData */
         StopData: {
@@ -2265,6 +2315,41 @@ export interface operations {
             };
         };
     };
+    answers_batch_api_v1_sessions__sid__questions_answers_batch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchAnswerRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchAnswerResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     answer_question_api_v1_sessions__sid__questions__question_key__answers_post: {
         parameters: {
             query?: never;
@@ -2477,6 +2562,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReportArchive"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_scenario_api_v1_sessions__sid__report_scenario_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportScenarioRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    solve_parity_api_v1_sessions__sid__report_scenario_solve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportScenarioSolveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScenarioSolveResponse"];
                 };
             };
             /** @description Validation Error */

@@ -49,6 +49,14 @@ function fixHref(offer: OfferReportView, field: string) {
   return `/complete?offer=${offer.offer_id}&field=${encodeURIComponent(field)}`;
 }
 
+/** 缺项提示里的字段名与表单口径一致：年终奖方式选「倍数」时，同一字段是「倍数」而非「金额」。 */
+function offerFieldLabel(offer: OfferReportView, field: string): string {
+  if (field === "annual_bonus_value" && offer.input_values?.annual_bonus_method === "multiple") {
+    return "年终奖倍数";
+  }
+  return fieldLabel(field);
+}
+
 /* ───────────────────────── 1 · 结论 ───────────────────────── */
 
 export function VerdictHero({ verdict }: { verdict: Verdict }) {
@@ -66,7 +74,7 @@ export function VerdictHero({ verdict }: { verdict: Verdict }) {
             href={fixHref(first.offer, first.fields[0])}
             className="no-print mt-6 inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-700 px-5 text-sm font-medium text-white hover:bg-blue-800"
           >
-            先补充 {nameOf(first.offer)} 的{fieldLabel(first.fields[0])}
+            先补充 {nameOf(first.offer)} 的{offerFieldLabel(first.offer, first.fields[0])}
             <ArrowRight aria-hidden="true" className="h-4 w-4" />
           </Link>
         )}
@@ -504,7 +512,7 @@ export function NextSteps({ offers }: { offers: OfferReportView[] }) {
           <li key={`${gap.offer.offer_id}-${gap.field}`}>
             <Link href={fixHref(gap.offer, gap.field)} className="group flex min-h-14 items-center justify-between gap-4 py-4">
               <span className="min-w-0">
-                <span className="block text-base font-medium text-ink">建议补充：{nameOf(gap.offer)} 的{fieldLabel(gap.field)}</span>
+                <span className="block text-base font-medium text-ink">建议补充：{nameOf(gap.offer)} 的{offerFieldLabel(gap.offer, gap.field)}</span>
                 <span className="mt-0.5 block text-sm text-slate-500">
                   {gap.reason === "required" ? "基本信息，不补就没有综合排名" : "其他 Offer 已经填了，补上后才会纳入比较"}
                 </span>

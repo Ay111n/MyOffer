@@ -43,7 +43,10 @@ test("三份示例完整且总分接近", async ({ page }) => {
   await expect(comparison.getByRole("heading", { name: /工作边界/ })).toBeVisible();
   await expect(comparison.getByText("三年年均税后现金")).toHaveCount(0);
   await expect(comparison.getByText("有效税后时薪")).toHaveCount(0);
-  expect(Math.max(...offers.map((offer) => offer.overall_score)) - Math.min(...offers.map((offer) => offer.overall_score))).toBeLessThan(5);
+  // 等权（不考虑买房）态：三份分差接近但仍有差距（引擎锁定 ≈2.7 分）
+  const spread = Math.max(...offers.map((offer) => offer.overall_score)) - Math.min(...offers.map((offer) => offer.overall_score));
+  expect(spread).toBeGreaterThan(1.5);
+  expect(spread).toBeLessThan(4);
 });
 
 test("两份示例按当前 Offer 数量填充且不覆盖用户修改", async ({ page }) => {

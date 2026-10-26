@@ -18,6 +18,51 @@ export function preferenceQuestionnaireDraftKey(sessionId: string): string {
   return `${PREFERENCE_DRAFT_PREFIX}${sessionId}`;
 }
 
+/** 清空当前会话的问卷草稿（保存成功 / 重新回答时调用）。 */
+export function clearQuestionnaireDraft(sessionId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(preferenceQuestionnaireDraftKey(sessionId));
+  } catch {
+    // 存储不可用时无草稿可清
+  }
+}
+
+/**
+ * 读取「已答完但尚未保存」的问卷作答。
+ *
+ * 问卷草稿随作答写入 sessionStorage，保存成功即被清除——因此草稿仍在且
+ * 四题齐全，就等价于用户表达过完整偏好但还没落库。生成报告会立即消费
+ * 权重，静默用默认/旧权重会偏离用户刚表达的偏好；生成入口据此提醒。
+ * 版本不匹配（规则更新后的残留草稿）、答不齐或内容损坏一律返回 null。
+ */
+export function readUnsavedQuestionnaireAnswers(
+  sessionId: string,
+  definition: PreferenceQuestionnaireResource,
+): PreferenceAnswer[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(preferenceQuestionnaireDraftKey(sessionId));
+    if (!raw) return null;
+    const draft = JSON.parse(raw) as { version?: unknown; answers?: unknown };
+    if (draft.version !== definition.version || !Array.isArray(draft.answers)) return null;
+    const questions = definition.questions ?? [];
+    if (questions.length === 0) return null;
+    const byId = new Map(
+      draft.answers
+        .filter((a): a is PreferenceAnswer => Boolean(a?.question_id && a?.choice))
+        .map((a) => [a.question_id as string, a.choice as string]),
+    );
+    if (!questions.every((question) => byId.has(question.question_id))) return null;
+    return questions.map((question) => ({
+      question_id: question.question_id,
+      choice: byId.get(question.question_id)!,
+    }));
+  } catch {
+    return null;
+  }
+}
+
 /** 将服务端归一化权重按最大余数法显示为合计 100 的整数百分比。 */
 export function roundWeightsToPercentages(
   weights: Record<string, number>,

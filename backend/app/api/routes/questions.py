@@ -11,6 +11,8 @@ from app.rules_runtime import get_rules
 from app.schemas import (
     AnswerRequest,
     AnswerResponse,
+    BatchAnswerRequest,
+    BatchAnswerResponse,
     QuestionsCatalogResponse,
     ResumeResponse,
     StopResponse,
@@ -28,6 +30,22 @@ def questions_catalog(session=Depends(require_owned_session), db: Session = Depe
     return QuestionsCatalogResponse(
         data=question_service.questions_catalog_payload(get_rules(), offers_data, phase=session.phase)
     )
+
+@router.post("/answers/batch", response_model=BatchAnswerResponse)
+def answers_batch(
+    body: BatchAnswerRequest,
+    session=Depends(require_owned_session),
+    db: Session = Depends(get_db),
+):
+    """批量提交多题草稿（「生成对比报告」路径）。
+
+    单事务逐题校验+写入、只重算一次、只落一条快照；任一题校验失败
+    整批拒绝（零写入），错误 details 附 question_key。单题端点保留，
+    供个别编辑继续使用。
+    """
+    payload = answer_service.submit_answers_batch(db, session, body.items, rules=get_rules())
+    return BatchAnswerResponse(**payload)
+
 
 @router.post("/{question_key}/answers", response_model=AnswerResponse)
 def answer_question(

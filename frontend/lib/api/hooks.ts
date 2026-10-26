@@ -78,6 +78,21 @@ export function useResult(
   });
 }
 
+/** 修改记录（快照历史头信息：seq/时间/触发/当时第一名），供结果页回看旧版本。 */
+export function useResultHistory(sid: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ["session", sid, "results", "history"],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/v1/sessions/{sid}/results/history", {
+        params: { path: { sid: sid! }, query: { limit: 20 } },
+      });
+      if (error) throw error;
+      return data.data;
+    },
+    enabled: !!sid && enabled,
+  });
+}
+
 export function useDueDiligence(sid: string | null) {
   return useQuery({
     queryKey: ["session", sid, "due-diligence"],
@@ -285,6 +300,25 @@ export function useSubmitAnswers(options: { silent?: boolean } = {}) {
       return data;
     },
     onSuccess: () => { if (!silent) invalidate(); },
+  });
+}
+
+/** 批量提交多题草稿（「生成对比报告」路径）：单事务、服务端只重算一次。
+ *
+ *  成功后不失效缓存——调用方在 stop 之前统一失效一次（同 useSubmitAnswers
+ *  的 silent 批量语义；逐次失效会放大请求量并撞 nginx 限流）。
+ *  失败时服务端整批回滚（草稿仍留在本机 sessionStorage，可安全重试），
+ *  错误 details 附 question_key 供定位。 */
+export function useSubmitAnswersBatch() {
+  return useMutation({
+    mutationFn: async (args: { sessionId: string; body: S["BatchAnswerRequest"] }) => {
+      const { data, error } = await api.POST("/api/v1/sessions/{sid}/questions/answers/batch", {
+        params: { path: { sid: args.sessionId } },
+        body: args.body,
+      });
+      if (error) throw error;
+      return data;
+    },
   });
 }
 

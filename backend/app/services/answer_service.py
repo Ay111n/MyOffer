@@ -202,25 +202,10 @@ def answers_changed(
     return False
 
 
-def submit_answers(
-    db: Session, session: DecisionSession, question_key: str, body, rules: RuleSet
-) -> dict:
-    """完整作答事务。返回 AnswerResponse 的组成部分（不包装 HTTP）。"""
-    ensure_rule_mirrors(db, rules)  # 惰性兜底：镜像缺失时 raw_facts/question_states FK 会失败
-
-    question_def = rules.questions.get("questions", {}).get(question_key)
-    if question_def is None:
-        raise _err(404, "not_found", f"Question '{question_key}' not found")
-    outputs = list(question_def.get("outputs", []))
-
-    session_offers = db.scalars(
-        select(Offer).where(Offer.session_id == session.id)
-    ).all()
-    session_offer_ids = {o.id for o in session_offers}
-
-    normalized = validate_and_normalize(rules, question_def, body.answers, session_offer_ids)
-
-    # ── no-op detection（修正 4）────────────────────────────
+def _load_question_state(
+    db: Session, session, question_key: str, outputs: list[str], offer_ids: list,
+) -> tuple[list, dict, list, dict]:
+    """读取某题当前 QuestionState / RawFact，供 no-op 比较与增量更新定位。"""
     state_rows = db.scalars(
         select(QuestionState).where(
             QuestionState.session_id == session.id,
@@ -228,7 +213,6 @@ def submit_answers(
         )
     ).all()
     existing_states = {r.offer_id: (r.status, r.answer) for r in state_rows}
-    offer_ids = [oid for oid in session_offer_ids]
     fact_rows = (
         db.scalars(
             select(RawFact).where(
@@ -240,16 +224,15 @@ def submit_answers(
     existing_facts = {
         (r.offer_id, r.field_key): (r.status, r.value, r.source, r.note) for r in fact_rows
     }
+    return state_rows, existing_states, fact_rows, existing_facts
 
-    if not answers_changed(existing_states, existing_facts, normalized):
-        db.commit()
-        return {
-            "data": {"question_key": question_key,
-                     "states": {str(oid): st for oid, (st, _a) in existing_states.items()}},
-            "decision": latest_echo(db, session),
-        }
 
-    # ── 写入 ───────────────────────────────────────────────
+def _write_question_answers(
+    db: Session, session, question_key: str, normalized: list[NormalizedAnswer],
+    state_rows: list, fact_rows: list, rules: RuleSet,
+) -> dict[str, str]:
+    """写入单题的 states/facts/尽调项（不 evaluate、不 commit）。
+    返回 offer_id 字符串 → 聚合状态。"""
     now_states: dict[str, str] = {}
     for ans in normalized:
         state_row = next((r for r in state_rows if r.offer_id == ans.offer_id), None)
@@ -352,6 +335,43 @@ def submit_answers(
                 ))
             else:
                 open_item.content = content
+    return now_states
+
+
+def submit_answers(
+    db: Session, session: DecisionSession, question_key: str, body, rules: RuleSet
+) -> dict:
+    """完整作答事务。返回 AnswerResponse 的组成部分（不包装 HTTP）。"""
+    ensure_rule_mirrors(db, rules)  # 惰性兜底：镜像缺失时 raw_facts/question_states FK 会失败
+
+    question_def = rules.questions.get("questions", {}).get(question_key)
+    if question_def is None:
+        raise _err(404, "not_found", f"Question '{question_key}' not found")
+    outputs = list(question_def.get("outputs", []))
+
+    session_offers = db.scalars(
+        select(Offer).where(Offer.session_id == session.id)
+    ).all()
+    session_offer_ids = {o.id for o in session_offers}
+
+    normalized = validate_and_normalize(rules, question_def, body.answers, session_offer_ids)
+
+    # ── no-op detection（修正 4）────────────────────────────
+    offer_ids = [oid for oid in session_offer_ids]
+    state_rows, existing_states, fact_rows, existing_facts = _load_question_state(
+        db, session, question_key, outputs, offer_ids)
+
+    if not answers_changed(existing_states, existing_facts, normalized):
+        db.commit()
+        return {
+            "data": {"question_key": question_key,
+                     "states": {str(oid): st for oid, (st, _a) in existing_states.items()}},
+            "decision": latest_echo(db, session),
+        }
+
+    # ── 写入 ───────────────────────────────────────────────
+    now_states = _write_question_answers(db, session, question_key, normalized,
+                                         state_rows, fact_rows, rules)
 
     # ── phase 迁移：results 阶段的作答意味着用户仍在补充信息，
     #    phase 回退 completion；再次点击「查看对比结果」才会回到 results。
@@ -363,3 +383,63 @@ def submit_answers(
         "data": {"question_key": question_key, "states": now_states},
         "decision": report_echo(_snapshot, seq),
     }
+
+
+def submit_answers_batch(db: Session, session: DecisionSession, items, rules: RuleSet) -> dict:
+    """批量作答事务（「生成对比报告」路径）。
+
+    与单题事务共享同一套校验 / no-op / 写入语义；差异只在重算次数：
+    逐题校验+写入（同一事务），全部成功后只 evaluate 一次、只落一条快照。
+    校验阶段先于任何写入，任一题失败即整批拒绝，天然原子；错误
+    details 附 question_key 供前端把错误定位回具体题目。
+    全部内容与现状一致（全 no-op）时不新增快照，复用最新 echo。
+    """
+    ensure_rule_mirrors(db, rules)
+
+    session_offer_ids = {o.id for o in db.scalars(
+        select(Offer).where(Offer.session_id == session.id)
+    ).all()}
+
+    prepared: list[tuple[str, dict, list[NormalizedAnswer]]] = []
+    seen_questions: set[str] = set()
+    for item in items:
+        question_key = item.question_key
+        question_def = rules.questions.get("questions", {}).get(question_key)
+        if question_def is None:
+            raise _err(404, "not_found", f"Question '{question_key}' not found",
+                       {"question_key": question_key})
+        if question_key in seen_questions:
+            raise _err(422, "validation_error", f"问题 {question_key} 在批内重复提交",
+                       {"question_key": question_key})
+        seen_questions.add(question_key)
+        try:
+            normalized = validate_and_normalize(rules, question_def, item.answers, session_offer_ids)
+        except HTTPException as exc:
+            detail = exc.detail if isinstance(exc.detail, dict) else {"message": str(exc.detail)}
+            inner = detail.get("details")
+            detail["details"] = {**(inner if isinstance(inner, dict) else {}),
+                                 "question_key": question_key}
+            exc.detail = detail
+            raise
+        prepared.append((question_key, question_def, normalized))
+
+    questions: dict[str, dict[str, str]] = {}
+    changed = False
+    for question_key, question_def, normalized in prepared:
+        outputs = list(question_def.get("outputs", []))
+        state_rows, existing_states, fact_rows, existing_facts = _load_question_state(
+            db, session, question_key, outputs, list(session_offer_ids))
+        if not answers_changed(existing_states, existing_facts, normalized):
+            questions[question_key] = {str(oid): st for oid, (st, _a) in existing_states.items()}
+            continue
+        questions[question_key] = _write_question_answers(
+            db, session, question_key, normalized, state_rows, fact_rows, rules)
+        changed = True
+
+    if not changed:
+        db.commit()
+        return {"data": {"questions": questions}, "decision": latest_echo(db, session)}
+    reopen_completion(session)
+    _snapshot, seq = evaluate_and_snapshot(db, session, trigger_type="batch_answered", rules=rules)
+    db.commit()
+    return {"data": {"questions": questions}, "decision": report_echo(_snapshot, seq)}

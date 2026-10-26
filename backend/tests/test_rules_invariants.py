@@ -1,4 +1,4 @@
-"""启动不变量校验测试（v0.7 报告引擎规则集）。"""
+"""启动不变量校验测试（v5 三维报告引擎规则集）。"""
 from datetime import date
 
 from app.rules_runtime import get_rules
@@ -47,7 +47,7 @@ def test_entrepreneurial_options_are_string_enums():
 
 
 def test_loader_fails_fast_on_broken_rules(tmp_path, monkeypatch):
-    """故意破坏钱维度模块权重和 → validate_rules 必须拒绝（fail-fast）。"""
+    """故意破坏薪资分档顺序 → validate_rules 必须拒绝（fail-fast）。"""
     import shutil
     from pathlib import Path
 
@@ -59,14 +59,15 @@ def test_loader_fails_fast_on_broken_rules(tmp_path, monkeypatch):
     broken = tmp_path / "rules"
     shutil.copytree(src, broken)
     report = yaml.safe_load((broken / "report.yaml").read_text(encoding="utf-8"))
-    report["money_module_weights"]["salary"] = 0.50  # 破坏权重和
+    bands = report["salary_score_bands"]
+    bands[0], bands[1] = bands[1], bands[0]  # 破坏 min 降序
     (broken / "report.yaml").write_text(yaml.safe_dump(report, allow_unicode=True), encoding="utf-8")
 
     import app.rules_runtime.loader as loader
 
     rules = loader.RuleSet.load(broken)
     violations = loader.validate_rules(rules)
-    assert any("money_module_weights" in v for v in violations)
+    assert any("salary_score_bands" in v for v in violations)
 
 
 def test_evidence_category_coverage():
@@ -109,25 +110,6 @@ def _mutated_rules(mutate):
     rules = copy.deepcopy(get_rules())
     mutate(rules)
     return rules
-
-
-def test_validate_rejects_enum_map_missing_option():
-    """report.yaml 枚举映射必须覆盖字段全部选项（死档位事故的回归测试）。"""
-    def _break(r):
-        r.report["stability"]["maps"]["kpi_pressure"].pop("no_kpi")
-
-    violations = validate_rules(_mutated_rules(_break))
-    assert any("kpi_pressure" in v for v in violations)
-
-
-def test_validate_rejects_city_axis_unknown_keys():
-    """回归：city_axis 的 key/source 曾是死配置（引擎只读 label 与 tier_score），
-    未知键必须在启动校验报错，防止「配置了但不生效」再次积累。"""
-    def _break(r):
-        r.report["development"]["city_axis"]["source"] = "other_score"
-
-    violations = validate_rules(_mutated_rules(_break))
-    assert any("city_axis" in v and "source" in v for v in violations)
 
 
 def test_validate_rejects_question_referencing_unknown_section():
@@ -191,10 +173,20 @@ def test_validate_rejects_min_band_order_drift():
 
 def test_validate_rejects_min_band_missing_zero_floor():
     def _break(r):
-        r.report["hourly_score_bands"][-1]["min"] = 5
+        r.report["salary_score_bands"][-1]["min"] = 5
 
     violations = validate_rules(_mutated_rules(_break))
-    assert any("hourly_score_bands" in v for v in violations)
+    assert any("salary_score_bands" in v for v in violations)
+
+
+def test_validate_rejects_purchasing_city_band_order_drift():
+    """购买力城市档表（max 型）max 必须严格升序、分数严格降序。"""
+    def _break(r):
+        bands = r.report["purchasing_city_bands"]
+        bands[0], bands[1] = bands[1], bands[0]
+
+    violations = validate_rules(_mutated_rules(_break))
+    assert any("purchasing_city_bands" in v for v in violations)
 
 
 def test_validate_rejects_max_band_order_drift():
@@ -209,10 +201,10 @@ def test_validate_rejects_max_band_order_drift():
 
 def test_validate_rejects_grade_order_drift():
     def _break(r):
-        r.report["grades"]["stability"][0]["min"] = 0.0
+        r.report["grades"]["salary"][0]["min"] = 0.0
 
     violations = validate_rules(_mutated_rules(_break))
-    assert any("grades.stability" in v for v in violations)
+    assert any("grades.salary" in v for v in violations)
 
 
 def test_validate_rejects_special_deduction_out_of_range():
@@ -237,15 +229,6 @@ def test_validate_rejects_saving_rate_out_of_range():
 
     violations = validate_rules(_mutated_rules(_break))
     assert any("down_payment_saving_rate" in v for v in violations)
-
-
-def test_validate_rejects_travel_frequency_map_gap():
-    """新接入的健康扣分源 travel_frequency 同样受枚举映射覆盖约束。"""
-    def _break(r):
-        r.report["health"]["maps"]["travel_frequency"].pop("monthly_gt8")
-
-    violations = validate_rules(_mutated_rules(_break))
-    assert any("travel_frequency" in v for v in violations)
 
 
 def test_validate_rejects_city_bad_housing_config():
