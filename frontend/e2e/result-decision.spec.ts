@@ -1,6 +1,44 @@
 import { expect, test, type Page } from "@playwright/test";
 import { fillExampleFactsViaApi } from "./helpers";
 
+test("南通衡阳分差接近时，结论不误报偏好容易反转", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: /Offer B.*0\/7/ })).toBeVisible();
+  const sid = await page.evaluate(() => sessionStorage.getItem("myoffer_sid"));
+  const offers = (await (await page.request.get(`/api/v1/sessions/${sid}/offers`)).json()).data;
+  const profiles = [
+    { city: "南通", monthly_base: 40000, guaranteed_salary_months: 13, business_level: "core", entry_scope: "assist_tasks", weekly_work_hours: 45, work_days_per_week: 5 },
+    { city: "衡阳", monthly_base: 36000, guaranteed_salary_months: 14, business_level: "important", entry_scope: "small_feature", weekly_work_hours: 40, work_days_per_week: 5 },
+  ];
+  for (const [index, offer] of offers.entries()) {
+    const patched = await page.request.patch(`/api/v1/sessions/${sid}/offers/${offer.offer_id}`, { data: {
+      version: offer.version,
+      facts: Object.entries(profiles[index]).map(([field_key, value]) => ({ field_key, value })),
+    } });
+    expect(patched.ok()).toBeTruthy();
+  }
+  const pref = await page.request.put(`/api/v1/sessions/${sid}/preferences`, { data: {
+    version: 1, source: "questionnaire", questionnaire_version: "v2", answers: [
+      { question_id: "economic_vs_growth", choice: "left_slight" },
+      { question_id: "economic_vs_experience", choice: "equal" },
+      { question_id: "growth_vs_experience", choice: "right_slight" },
+      { question_id: "buy_house_intent", choice: "consider" },
+    ],
+  } });
+  expect(pref.ok(), await pref.text()).toBeTruthy();
+  await page.reload();
+  await page.getByRole("button", { name: "生成对比报告" }).click();
+  await page.waitForURL(/\/results/);
+  const result = (await (await page.request.get(`/api/v1/sessions/${sid}/result`)).json()).data;
+  expect(result.sensitivity.status).toBe("steady");
+  expect(result.sensitivity.margin).toBeGreaterThanOrEqual(0.3);
+  const scores = result.offers.map((offer: { overall_score: number }) => offer.overall_score);
+  expect(Math.abs(scores[0] - scores[1])).toBeLessThan(3);
+  await expect(page.locator("#verdict")).toContainText("分数接近");
+  await expect(page.locator("#verdict")).not.toContainText("偏好稍有变化");
+  await expect(page.locator("#stability")).toContainText("比较稳");
+});
+
 async function generateSampleReport(page: Page) {
   await page.goto("/");
   await expect(page.getByRole("button", { name: /Offer B.*0\/7/ })).toBeVisible();

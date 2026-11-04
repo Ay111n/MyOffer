@@ -2,6 +2,75 @@ import { expect, test } from "@playwright/test";
 
 import { fillExampleFactsViaApi } from "./helpers";
 
+test("公司名 Tab 保存只提交一次，岗位可继续保存且刷新保留", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: /Offer B.*0\/7/ })).toBeVisible();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  let requests = 0;
+  const statuses: number[] = [];
+  page.on("response", (response) => {
+    if (response.request().method() === "PATCH" && /\/offers\/[^/]+$/.test(new URL(response.url()).pathname)) {
+      statuses.push(response.status());
+    }
+  });
+  await page.route("**/api/v1/sessions/*/offers/*", async (route) => {
+    if (route.request().method() === "PATCH") {
+      requests++;
+      await gate;
+    }
+    await route.continue();
+  });
+  const company = page.getByRole("textbox", { name: /的公司名称$/ });
+  const position = page.getByRole("textbox", { name: /的岗位$/ });
+  await company.fill("Tab 保存验证");
+  await company.press("Tab");
+  try {
+    await expect(company).toBeDisabled();
+    await expect(position).toBeDisabled();
+    // 再做一次真实焦点切换，让 pending 禁用输入导致的 blur 完整处理。
+    await page.getByRole("button", { name: "经济回报", exact: true }).click();
+  } finally {
+    release();
+  }
+  await expect(position).toBeEnabled();
+  await expect(page.getByRole("button", { name: /^Tab 保存验证/ })).toBeVisible();
+  expect(requests).toBe(1);
+  expect(statuses).toEqual([200]);
+  await expect(page.getByText("保存失败", { exact: true })).toHaveCount(0);
+  await position.fill("开发工程师");
+  await position.press("Tab");
+  await expect(page.getByText("已保存", { exact: true })).toBeVisible();
+  await expect(position).toBeEnabled();
+  expect(statuses).toEqual([200, 200]);
+  await page.reload();
+  await expect(company).toHaveValue("Tab 保存验证");
+  await expect(position).toHaveValue("开发工程师");
+});
+
+test("真实保存失败仍提示错误，重试后可恢复", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: /Offer B.*0\/7/ })).toBeVisible();
+  await page.route("**/api/v1/sessions/*/offers/*", async (route) => {
+    if (route.request().method() === "PATCH") {
+      await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: { code: "server_busy", message: "fixture" } }) });
+    } else {
+      await route.continue();
+    }
+  }, { times: 1 });
+  const company = page.getByRole("textbox", { name: /的公司名称$/ });
+  await company.fill("失败后重试");
+  await company.press("Enter");
+  await expect(page.getByText("保存失败", { exact: true })).toBeVisible();
+  await expect(company).toBeEnabled();
+  await company.fill("失败后重试");
+  await company.press("Enter");
+  await expect(page.getByText("已保存", { exact: true })).toBeVisible();
+  await expect(page.getByText("保存失败", { exact: true })).toHaveCount(0);
+  await page.reload();
+  await expect(company).toHaveValue("失败后重试");
+});
+
 /**
  * 第二轮功能的 E2E 固化：Offer 命名全链路 + 免写入试算 + 反解追平线。
  * 此前仅做过手工浏览器验证，本文件将其固化为回归锁。

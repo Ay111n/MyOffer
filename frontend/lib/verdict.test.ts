@@ -115,6 +115,20 @@ describe("stabilityCopy", () => {
   const flip = { dimension: "experience", current_weight: 0.333, flip_weight: 0.38, direction: "up" as const, overtaken_by: b.offer_id, ties: false };
   const base: Sensitivity = { status: "fragile", leader_id: a.offer_id, nearest: flip, flips: [flip], weight_min: 0.05, weight_max: 0.9 };
 
+  it("接近的分差不推断偏好敏感性，稳定性仍由后端结果决定", () => {
+    const offers = [
+      offer({ display_order: 1, overall_rank: 2, overall_score: 75.2 }),
+      offer({ display_order: 2, overall_rank: 1, overall_score: 77.8 }),
+    ];
+    const verdict = buildVerdict(offers);
+    expect(verdict.kind).toBe("ranked");
+    if (verdict.kind !== "ranked") return;
+    expect(verdict.strength.label).toBe("接近");
+    expect(verdict.strength.meaning).not.toMatch(/稍有变化|反过来|很稳|不太稳/);
+    expect(stabilityCopy({ ...base, status: "steady", margin: 0.32 }, offers).title).toBe("比较稳");
+    expect(stabilityCopy({ ...base, margin: 0.02 }, offers).title).toBe("不太稳");
+  });
+
   it("把翻转点说成人话", () => {
     expect(flipAction(flip)).toBe("把「工作体验」提高到 38%（现在 33%）");
     const copy = stabilityCopy(base, [a, b]);

@@ -24,7 +24,7 @@ export const STRENGTH_SCALE: { level: StrengthLevel; label: string }[] = [
 export function strengthOfGap(gap: number): { level: StrengthLevel; label: string; meaning: string } {
   const g = Math.abs(gap);
   if (g < 1) return { level: "toss", label: "几乎打平", meaning: "分差很小，别只看这一个数字，更要看下面的取舍。" };
-  if (g < 3) return { level: "near", label: "接近", meaning: "领先不多。你的偏好稍有变化，排名就可能反过来。" };
+  if (g < 3) return { level: "near", label: "接近", meaning: "分数接近，建议结合差异来源和下方的偏好稳定性一起判断。" };
   if (g < 8) return { level: "moderate", label: "有一定优势", meaning: "领先是实打实的，但还没拉开到可以忽略其他因素。" };
   return { level: "clear", label: "明显领先", meaning: "差距足够大，按目前的信息和你的偏好，结论比较明确。" };
 }

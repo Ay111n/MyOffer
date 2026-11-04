@@ -44,6 +44,7 @@ function OfferIdentityRow({ offer }: { offer: OfferResource }) {
   const [position, setPosition] = useState(offer.position);
   const [saved, setSaved] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
+  const savingRef = useRef(false);
   const fallbackName = `Offer ${String.fromCharCode(64 + offer.display_order)}`;
   // 服务端值变化（如保存成功后重取）时同步输入框；正在编辑时不打断
   const editingRef = useRef(false);
@@ -55,6 +56,9 @@ function OfferIdentityRow({ offer }: { offer: OfferResource }) {
   }, [offer.company, offer.position]);
 
   const save = (nextCompany: string, nextPosition: string) => {
+    // Tab 先让岗位框获得焦点，pending 禁用它时会再次触发 blur。
+    // 同一轮事件中的闭包还看不到 isPending，须在发送前同步拦住重复提交。
+    if (savingRef.current) return;
     editingRef.current = false;
     const trimmedCompany = nextCompany.trim();
     if (!sessionId) return;
@@ -65,6 +69,7 @@ function OfferIdentityRow({ offer }: { offer: OfferResource }) {
       return;
     }
     if (trimmedCompany === offer.company && nextPosition === offer.position) return;
+    savingRef.current = true;
     patch.mutate(
       {
         sessionId,
@@ -89,6 +94,7 @@ function OfferIdentityRow({ offer }: { offer: OfferResource }) {
           setPosition(offer.position);
           setSaveFailed(true);
         },
+        onSettled: () => { savingRef.current = false; },
       },
     );
   };
