@@ -81,8 +81,8 @@ describe("draft-storage（未提交草稿的 localStorage 持久化 + 24h 过期
       JSON.stringify({ t: Date.now() - 25 * 3600_000, v: { o1: { f1: { status: "known", value: 1 } } } }),
     );
     expect(listOrphanDraftSessions("current")).toEqual(["old-1"]);
-    // 没有当前会话时，所有含内容的会话都是可恢复对象
-    expect(listOrphanDraftSessions(null)).toEqual(["old-1", "current"]);
+    // 此处核对筛选结果；连续写入可能同毫秒，也可能跨毫秒，排序由下个用例验证。
+    expect(new Set(listOrphanDraftSessions(null))).toEqual(new Set(["old-1", "current"]));
   });
 
   it("listOrphanDraftSessions 按最近保存时间新→旧排序", () => {
