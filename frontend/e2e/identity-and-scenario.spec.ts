@@ -38,8 +38,13 @@ test("公司名 Tab 保存只提交一次，岗位可继续保存且刷新保留
   expect(requests).toBe(1);
   expect(statuses).toEqual([200]);
   await expect(page.getByText("保存失败", { exact: true })).toHaveCount(0);
+  const positionSaved = page.waitForResponse((response) =>
+    response.request().method() === "PATCH"
+    && /\/offers\/[^/]+$/.test(new URL(response.url()).pathname)
+    && response.request().postDataJSON()?.position === "开发工程师");
   await position.fill("开发工程师");
   await position.press("Tab");
+  expect((await positionSaved).status()).toBe(200);
   await expect(page.getByText("已保存", { exact: true })).toBeVisible();
   await expect(position).toBeEnabled();
   expect(statuses).toEqual([200, 200]);
