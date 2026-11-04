@@ -18,7 +18,11 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
         </p>
         <div className="mt-6 flex justify-center gap-2">
           <Button onClick={reset}>重试</Button>
-          <Button variant="ghost" onClick={() => { window.location.href = "/"; }}>返回首页</Button>
+          <Button variant="ghost" onClick={() => {
+            // 错误可能发生在首页本身；同路由客户端导航不会重置失败的页面树。
+            // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- 错误恢复需要整页重载，首页也能重新初始化。
+            window.location.href = "/";
+          }}>返回首页</Button>
         </div>
       </Card>
     </div>

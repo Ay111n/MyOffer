@@ -17,7 +17,7 @@ import { readApiError } from "@/lib/api/errors";
 import { clearDemoFlag, readDemoFlag } from "@/lib/demo-flag";
 import { preferenceWeightSummary } from "@/lib/preference-questionnaire";
 
-import { buildVerdict } from "@/lib/verdict";
+import { buildVerdict, nameOf as offerName } from "@/lib/verdict";
 import { useFlowStore, useHydrateSession } from "@/stores/flow-store";
 
 const money = (value: number | null | undefined) => value == null ? "—" : `¥${Math.round(value).toLocaleString("zh-CN")}`;
@@ -39,7 +39,7 @@ function TaxInsuranceDialog({ offers }: { offers: OfferReportView[] }) {
         <h2 className="text-xl font-semibold">税后与五险一金</h2>
         <button type="button" onClick={() => dialog.current?.close()} aria-label="关闭明细" className="min-h-11 rounded-lg border border-slate-300 px-4 text-sm text-slate-700 hover:bg-slate-50">关闭</button>
       </div>
-      <div className="flex gap-2 border-b border-hairline px-5 py-3 sm:px-7" aria-label="选择 Offer">{offers.map((item) => <button key={item.offer_id} type="button" aria-pressed={item.offer_id === offer.offer_id} onClick={() => setSelectedOfferId(item.offer_id)} className={`min-h-11 rounded-lg px-4 text-sm font-medium transition-colors ${item.offer_id === offer.offer_id ? "bg-ink text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{item.company}</button>)}</div>
+      <div className="flex gap-2 border-b border-hairline px-5 py-3 sm:px-7" aria-label="选择 Offer">{offers.map((item) => <button key={item.offer_id} type="button" aria-pressed={item.offer_id === offer.offer_id} onClick={() => setSelectedOfferId(item.offer_id)} className={`min-h-11 rounded-lg px-4 text-sm font-medium transition-colors ${item.offer_id === offer.offer_id ? "bg-ink text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{offerName(item)}</button>)}</div>
       <div className="space-y-8 px-5 py-6 sm:px-7">
         <dl className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">{[
           ["固定年税后", money(offer.key_numbers?.annual_net)],
@@ -212,7 +212,7 @@ function useHasPendingDrafts(sessionId: string | null): boolean {
   return pending;
 }
 
-function DraftsPendingBanner({ sessionId, empty }: { sessionId: string; empty?: boolean }) {
+function DraftsPendingBanner({ empty }: { empty?: boolean }) {
   return (
     <div className="no-print mb-8 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-card border border-blue-200 bg-blue-50/70 px-4 py-3.5 sm:px-5">
       <p className="flex min-h-11 items-center gap-2.5 text-sm leading-6 text-blue-900">
@@ -250,7 +250,7 @@ function ReportAnalysis({ offers, historyView = false }: { offers: OfferReportVi
     return <section key={section.key} className="min-w-0">
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-ink pb-3"><div><p className="eyebrow">维度 0{sectionIndex + 1}</p><h2 className="section-title mt-1">{section.label}</h2></div>{section.key === "economic" && <TaxInsuranceDialog offers={offers} />}</div>
       <div>
-        <div className={`grid ${columns} items-center gap-3 border-b border-hairline py-3 text-xs font-semibold text-slate-500`}><span className={`${labelSpan} hidden md:block`}>对比结果</span>{offers.map((offer) => <span key={offer.offer_id} className="truncate text-right">{offer.company}</span>)}</div>
+        <div className={`grid ${columns} items-center gap-3 border-b border-hairline py-3 text-xs font-semibold text-slate-500`}><span className={`${labelSpan} hidden md:block`}>对比结果</span>{offers.map((offer) => <span key={offer.offer_id} className="truncate text-right">{offerName(offer)}</span>)}</div>
         <div className={`grid ${columns} items-center gap-x-3 gap-y-1 border-b border-hairline bg-slate-100/70 px-3 py-3`} aria-label={`${section.label}维度总分`}>
           <span className={`${labelSpan} text-sm font-semibold text-ink`}>维度总分</span>
           {offers.map((offer) => <strong key={offer.offer_id} className="metric text-right text-xl text-ink">{score(offer.dimension_scores?.[section.key])}<span className="ml-1 text-xs font-normal text-slate-500">分</span></strong>)}
@@ -263,8 +263,36 @@ function ReportAnalysis({ offers, historyView = false }: { offers: OfferReportVi
           }));
           return <div key={fullKey} className="border-b border-hairline py-4 last:border-0">
             <div className={`grid ${columns} items-baseline gap-x-3 gap-y-1`}><h3 className={`${labelSpan} relative font-semibold text-ink`}>{category.label}<FieldInfo label={category.label} summary={fieldSummaries[fullKey]} description={fieldExplanations[fullKey]} /></h3>{offers.map((offer) => <div key={offer.offer_id} className="metric text-right font-semibold text-ink">{score(offer.sub_scores?.[fullKey])}<span className="ml-1 text-xs font-normal text-slate-500">分</span></div>)}</div>
-            {metrics.map((metric) => <div key={metric.key} className={`mt-2 grid ${columns} gap-x-3 gap-y-1 text-sm`}><span className={`${labelSpan} relative text-slate-500`}>{metric.label}<FieldInfo label={metric.label} description={fieldExplanations[`${section.key}.${metric.key}`]} /></span>{offers.map((offer) => <span key={offer.offer_id} className="num min-w-0 text-right text-slate-700">{metricValue(offer, `${section.key}.${metric.key}`, metric.format)}</span>)}</div>)}
-            {fullKey === "economic.cash" && offers.some((offer) => offer.compliance_alert) && <p className="mt-2 text-xs leading-5 text-amber-800">{offers.filter((offer) => offer.compliance_alert).map((offer) => offer.company).join("、")} 的缴费安排需核实；现金与购买力评分已排除未缴或最低基数缴费带来的到手增量。</p>}
+            {metrics.map((metric) => {
+              const metricKey = `${section.key}.${metric.key}`;
+              // 月供收入比是危险信号：≥100% 银行不可能放贷，必须警示级呈现
+              // 而非与普通数字同样平铺（2026-10-27 试用反馈）
+              const isRatio = metric.key === "payment_income_ratio";
+              const values = offers.map((offer) => offer.sub_metrics?.[metricKey] ?? null);
+              const known = values.filter((v): v is number => v != null);
+              const worstRatio = isRatio && known.length > 0 ? Math.max(...known) : null;
+              return (
+                <div key={metric.key} className="mt-2">
+                  <div className={`grid ${columns} gap-x-3 gap-y-1 text-sm`}>
+                    <span className={`${labelSpan} relative text-slate-500`}>{metric.label}<FieldInfo label={metric.label} description={fieldExplanations[metricKey]} /></span>
+                    {offers.map((offer, index) => {
+                      const v = values[index];
+                      const tone = isRatio && v != null
+                        ? v >= 1 ? "font-semibold text-red-700" : v >= 0.5 ? "font-semibold text-amber-800" : "text-slate-700"
+                        : "text-slate-700";
+                      return <span key={offer.offer_id} className={`num min-w-0 text-right ${tone}`}>{metricValue(offer, metricKey, metric.format)}</span>;
+                    })}
+                  </div>
+                  {isRatio && worstRatio != null && worstRatio >= 1 && (
+                    <p className="mt-1.5 text-xs leading-5 text-red-700">月供已超过到手收入——这个比例下银行通常不会放贷，需要重新评估购房预算或收入。</p>
+                  )}
+                  {metric.key === "scored_recurring_net" && values.some((v) => v == null) && (
+                    <p className="mt-1.5 text-xs leading-5 text-slate-500">「—」＝该份 Offer 不涉及少缴多拿的口径调整，评分直接用实际到手现金。</p>
+                  )}
+                </div>
+              );
+            })}
+            {fullKey === "economic.cash" && offers.some((offer) => offer.compliance_alert) && <p className="mt-2 text-xs leading-5 text-amber-800">{offers.filter((offer) => offer.compliance_alert).map((offer) => offerName(offer)).join("、")} 的缴费安排需核实；现金与购买力评分已排除未缴或最低基数缴费带来的到手增量。</p>}
           </div>;
         })}
       </div>
@@ -410,7 +438,7 @@ function ResultPageInner() {
 
   if (!sessionId) return <NeedSession />;
   if (isLoading) return <Spinner label="正在生成对比…" />;
-  if (!view) return <main className="mx-auto max-w-6xl px-5 py-14"><h1 className="text-2xl font-semibold">对比报告</h1><p className="mt-4 text-sm text-slate-600">{readApiError(error, "请先填写 Offer 信息")}</p>{pendingDrafts && <div className="mt-6 max-w-xl"><DraftsPendingBanner sessionId={sessionId} empty /></div>}<Link href="/complete" className="mt-5 inline-flex min-h-11 items-center text-sm underline">返回填写</Link></main>;
+  if (!view) return <main className="mx-auto max-w-6xl px-5 py-14"><h1 className="text-2xl font-semibold">对比报告</h1><p className="mt-4 text-sm text-slate-600">{readApiError(error, "请先填写 Offer 信息")}</p>{pendingDrafts && <div className="mt-6 max-w-xl"><DraftsPendingBanner empty /></div>}<div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm"><Link href="/complete" className="inline-flex min-h-11 items-center underline">返回填写</Link><Link href="/" className="inline-flex min-h-11 items-center text-blue-700 underline-offset-4 hover:underline">先看一份填写完整的示例报告</Link></div></main>;
 
   const offers = [...(view.offers ?? [])].sort((a, b) => a.display_order - b.display_order);
   const verdict = buildVerdict(offers);
@@ -419,7 +447,7 @@ function ResultPageInner() {
 
   return <AiReportAnalysisProvider sessionId={sessionId} snapshotSeq={view.snapshot_seq} complete={ranked}><main className="report-document mx-auto max-w-5xl text-ink">
     {isDemo && <DemoBanner sessionId={sessionId} />}
-    {pendingDrafts && !viewingHistory && <DraftsPendingBanner sessionId={sessionId} />}
+    {pendingDrafts && !viewingHistory && <DraftsPendingBanner />}
     {viewingHistory && (
       <div className="no-print mb-8 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 rounded-card border border-amber-200 bg-amber-50 px-4 py-3.5 text-sm text-amber-900 sm:px-5">
         <p>正在查看第 {view.snapshot_seq} 次结果（历史版本，生成于 {new Date(view.computed_at).toLocaleString("zh-CN")}），仅供参考对照。</p>
@@ -437,7 +465,35 @@ function ResultPageInner() {
       </div>
     </header>
 
-    <section aria-labelledby="scores-title" className="border-t border-hairline py-10">
+    {/* 零事实 Offer 被排除在评分池外（后端口径），报告需交代少的那一份 */}
+    {(view.excluded_offers?.length ?? 0) > 0 && (
+      <p className="mb-8 rounded-card border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+        {(view.excluded_offers ?? []).join("、")} 还没有填写，未纳入本次比较；填好后重新生成报告即可参与。
+      </p>
+    )}
+
+    {/* 页内目录：报告十余个区块单列滚动，回看某个区块只能长距离滚动
+        （2026-10-27 试用反馈）；只列当前视图中实际渲染的区块 */}
+    <nav aria-label="报告页目录" className="report-nav no-print">
+      <ul className="flex list-none flex-wrap gap-1 p-0">
+        {([
+          ["scores", "得分"],
+          ["verdict", "结论"],
+          ...(ranked ? [["why", "原因"], ["diff", "差异"], ["stability", "稳不稳"]] : []),
+          ...(!viewingHistory && ranked ? [["scenario", "试算"]] : []),
+          ["reliability", "靠不靠谱"],
+          ["next", "下一步"],
+          ...(hasDetail(offers) ? [["details", "详细依据"]] : []),
+          ["history", "修改记录"],
+        ] as [string, string][]).map(([id, label]) => (
+          <li key={id}>
+            <a href={`#${id}`} className="inline-flex min-h-9 items-center whitespace-nowrap rounded-lg text-sm">{label}</a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+
+    <section id="scores" aria-labelledby="scores-title" className="border-t border-hairline py-10">
       <h2 id="scores-title" className="section-title">三个维度的得分</h2>
       <div className="mt-6">
         <Scoreboard offers={offers} />
@@ -453,12 +509,14 @@ function ResultPageInner() {
     <KeyNumbers offers={offers} />
     <Stability offers={offers} sensitivity={view.sensitivity} />
     {!viewingHistory && ranked && (
-      <ScenarioPanel sessionId={sessionId} snapshotSeq={view.snapshot_seq} offers={offers} />
+      <div id="scenario">
+        <ScenarioPanel sessionId={sessionId} snapshotSeq={view.snapshot_seq} offers={offers} />
+      </div>
     )}
     <Reliability offers={offers} verdict={verdict} />
     <NextSteps offers={offers} />
 
-    <section aria-label="总体结果分析">
+    <section id="ai-analysis" aria-label="总体结果分析">
       {viewingHistory
         ? <p className="no-print text-sm text-slate-500">AI 解读只在最新结果上可用，回到最新后即可生成。</p>
         : <AiReportSection part="overall" />}
@@ -466,12 +524,13 @@ function ResultPageInner() {
 
     {hasDetail(offers) && <div id="details" className="mt-4 border-t-2 border-ink pt-10">
       <p className="eyebrow">详细依据</p>
-      <h2 className="section-title mt-2">每一分是怎么来的</h2>
-      <p className="section-lede mb-10 mt-2">需要核对细节时再看这里：各维度的分项、具体数字，以及税后和五险一金的逐月计算。</p>
+      <h2 className="section-title mb-8 mt-2">每一分是怎么来的</h2>
       <ReportAnalysis offers={offers} historyView={viewingHistory} />
     </div>}
 
-    <HistoryPanel sessionId={sessionId} currentSeq={view.snapshot_seq} offers={offers} onSelect={setViewSeq} />
+    <div id="history">
+      <HistoryPanel sessionId={sessionId} currentSeq={view.snapshot_seq} offers={offers} onSelect={setViewSeq} />
+    </div>
   </main></AiReportAnalysisProvider>;
 }
 

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { fillExampleFactsViaApi } from "./helpers";
 
 test("四部分分别生成 AI 解读，刷新后保留各自结果", async ({ page }) => {
   test.setTimeout(120_000);
@@ -50,7 +51,7 @@ test("四部分分别生成 AI 解读，刷新后保留各自结果", async ({ p
 
   await page.goto("/");
   await expect(page.getByRole("button", { name: /Offer B.*0\/7/ })).toBeVisible();
-  await page.getByRole("button", { name: "填入示例数据" }).click();
+  await fillExampleFactsViaApi(page);
   await page.getByRole("button", { name: /点击测试我更在意什么/ }).click();
   for (let index = 0; index < 3; index++) {
     await page.getByRole("button", { name: "一样重要" }).click();

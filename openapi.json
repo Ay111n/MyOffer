@@ -1,0 +1,5188 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Offer Decision API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/sessions": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Create Session",
+        "operationId": "create_session_api_v1_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/SessionCreateRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sid}": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Get Session",
+        "operationId": "get_session_api_v1_sessions__sid__get",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Delete Session",
+        "operationId": "delete_session_api_v1_sessions__sid__delete",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/restore": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Restore Report",
+        "operationId": "restore_report_api_v1_sessions_restore_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportRestoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sid}/offers": {
+      "post": {
+        "tags": [
+          "offers"
+        ],
+        "summary": "Create Offer",
+        "operationId": "create_offer_api_v1_sessions__sid__offers_post",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OfferCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfferMutationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "offers"
+        ],
+        "summary": "List Offers",
+        "operationId": "list_offers_api_v1_sessions__sid__offers_get",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfferListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sid}/offers/{oid}": {
+      "patch": {
+        "tags": [
+          "offers"
+        ],
+        "summary": "Patch Offer",
+        "operationId": "patch_offer_api_v1_sessions__sid__offers__oid__patch",
+        "parameters": [
+          {
+            "name": "oid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Oid"
+            }
+          },
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OfferPatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfferMutationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "offers"
+        ],
+        "summary": "Delete Offer",
+        "operationId": "delete_offer_api_v1_sessions__sid__offers__oid__delete",
+        "parameters": [
+          {
+            "name": "oid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Oid"
+            }
+          },
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfferMutationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sid}/offers/{oid}/reset": {
+      "post": {
+        "tags": [
+          "offers"
+        ],
+        "summary": "Reset Offer",
+        "operationId": "reset_offer_api_v1_sessions__sid__offers__oid__reset_post",
+        "parameters": [
+          {
+            "name": "oid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Oid"
+            }
+          },
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OfferResetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfferMutationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sid}/preferences": {
+      "get": {
+        "tags": [
+          "preferences"
+        ],
+        "summary": "Get Preferences",
+        "operationId": "get_preferences_api_v1_sessions__sid__preferences_get",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferenceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "preferences"
+        ],
+        "summary": "Put Preferences",
+        "operationId": "put_preferences_api_v1_sessions__sid__preferences_put",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferencePutRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferenceMutationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sid}/questions": {
+      "get": {
+        "tags": [
+          "questions"
+        ],
+        "summary": "Questions Catalog",
+        "description": "按板块/轮次分组的问题目录（round 1 默认采集，round 2 由结果页引导进入）。",
+        "operationId": "questions_catalog_api_v1_sessions__sid__questions_get",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionsCatalogResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sid}/questions/answers/batch": {
+      "post": {
+        "tags": [
+          "questions"
+        ],
+        "summary": "Answers Batch",
+        "description": "批量提交多题草稿（「生成对比报告」路径）。\n\n单事务逐题校验+写入、只重算一次、只落一条快照；任一题校验失败\n整批拒绝（零写入），错误 details 附 question_key。单题端点保留，\n供个别编辑继续使用。",
+        "operationId": "answers_batch_api_v1_sessions__sid__questions_answers_batch_post",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchAnswerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchAnswerResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sid}/questions/{question_key}/answers": {
+      "post": {
+        "tags": [
+          "questions"
+        ],
+        "summary": "Answer Question",
+        "operationId": "answer_question_api_v1_sessions__sid__questions__question_key__answers_post",
+        "parameters": [
+          {
+            "name": "question_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "title": "Question Key"
+            }
+          },
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnswerResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sid}/questions/resume": {
+      "post": {
+        "tags": [
+          "questions"
+        ],
+        "summary": "Resume Questions",
+        "description": "撤销「查看对比结果」状态，回到信息补全。",
+        "operationId": "resume_questions_api_v1_sessions__sid__questions_resume_post",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sid}/questions/stop": {
+      "post": {
+        "tags": [
+          "questions"
+        ],
+        "summary": "Stop Questions",
+        "description": "完成本轮补全，进入结果对比（phase → results）。\n\n语义：stop 只写 phase 交互状态，绝不修改结论强度——sufficiency\n原样来自最新快照。任何后续写入会把 phase 自动退回 completion。\n例外：创建后未做任何写入的会话没有快照，直接放行会让结果页\n404——这里先评估一份基线快照。",
+        "operationId": "stop_questions_api_v1_sessions__sid__questions_stop_post",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StopResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sid}/result": {
+      "get": {
+        "tags": [
+          "results"
+        ],
+        "summary": "Latest Result",
+        "operationId": "latest_result_api_v1_sessions__sid__result_get",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sid}/results/history": {
+      "get": {
+        "tags": [
+          "results"
+        ],
+        "summary": "Result History",
+        "operationId": "result_history_api_v1_sessions__sid__results_history_get",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sid}/results/{seq}": {
+      "get": {
+        "tags": [
+          "results"
+        ],
+        "summary": "Result By Seq",
+        "operationId": "result_by_seq_api_v1_sessions__sid__results__seq__get",
+        "parameters": [
+          {
+            "name": "seq",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Seq"
+            }
+          },
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sid}/report/export": {
+      "get": {
+        "tags": [
+          "results"
+        ],
+        "summary": "Export Report",
+        "operationId": "export_report_api_v1_sessions__sid__report_export_get",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportArchive"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sid}/report/scenario": {
+      "post": {
+        "tags": [
+          "results"
+        ],
+        "summary": "Run Scenario",
+        "description": "免写入试算：在最新快照上按调整值（月薪/奖金倍数/工时/通勤）重打一次分。\n\n只接受最新快照的 seq（防陈旧，与 AI 分析同一守卫）；scenario() 全程\n不落库、不产生新快照，返回的是一次性的对比结果投影。",
+        "operationId": "run_scenario_api_v1_sessions__sid__report_scenario_post",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportScenarioRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sid}/report/scenario/solve": {
+      "post": {
+        "tags": [
+          "results"
+        ],
+        "summary": "Solve Parity",
+        "description": "反解追平点：目标 Offer 的月薪谈到多少能追平当前第一名。\n\n与试算同一防陈旧守卫（只接受最新快照 seq）；内部反复调用免写入\n试算二分求解，全程不落库、不产生新快照。",
+        "operationId": "solve_parity_api_v1_sessions__sid__report_scenario_solve_post",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportScenarioSolveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScenarioSolveResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sid}/report/ai-analysis": {
+      "post": {
+        "tags": [
+          "results"
+        ],
+        "summary": "Start Ai Analysis",
+        "operationId": "start_ai_analysis_api_v1_sessions__sid__report_ai_analysis_post",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiReportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sid}/due-diligence": {
+      "get": {
+        "tags": [
+          "due-diligence"
+        ],
+        "summary": "List Due",
+        "operationId": "list_due_api_v1_sessions__sid__due_diligence_get",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DueDiligenceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sid}/due-diligence/{item_id}": {
+      "patch": {
+        "tags": [
+          "due-diligence"
+        ],
+        "summary": "Patch Due",
+        "operationId": "patch_due_api_v1_sessions__sid__due_diligence__item_id__patch",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DueDiligencePatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DueDiligencePatchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sid}/telemetry": {
+      "post": {
+        "tags": [
+          "telemetry"
+        ],
+        "summary": "Record Events",
+        "operationId": "record_events_api_v1_sessions__sid__telemetry_post",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelemetryBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryBatchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/meta": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Get Meta",
+        "operationId": "get_meta_api_v1_meta_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetaResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ai/bootstrap": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Bootstrap",
+        "operationId": "bootstrap_api_v1_ai_bootstrap_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConfigResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ai/config": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Config",
+        "operationId": "config_api_v1_ai_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConfigResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ai/providers/{provider}/key": {
+      "put": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Save Key",
+        "operationId": "save_key_api_v1_ai_providers__provider__key_put",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiKeyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConfigResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ai/providers/{provider}": {
+      "delete": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Disconnect",
+        "operationId": "disconnect_api_v1_ai_providers__provider__delete",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConfigResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ai/selection": {
+      "put": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Select Model",
+        "operationId": "select_model_api_v1_ai_selection_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiSelection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConfigResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ai/providers/{provider}/login": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Login",
+        "operationId": "login_api_v1_ai_providers__provider__login_post",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ai/test": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Test Connection",
+        "operationId": "test_connection_api_v1_ai_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiSelection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ai/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Job Status",
+        "operationId": "job_status_api_v1_ai_jobs__job_id__get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Cancel",
+        "operationId": "cancel_api_v1_ai_jobs__job_id__delete",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ai/jobs/{job_id}/reply": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Reply",
+        "operationId": "reply_api_v1_ai_jobs__job_id__reply_post",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiReplyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Healthz",
+        "operationId": "healthz_healthz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Readyz",
+        "operationId": "readyz_readyz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AiCheck": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "checked_at": {
+            "type": "string",
+            "title": "Checked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "ok",
+          "checked_at"
+        ],
+        "title": "AiCheck"
+      },
+      "AiConfig": {
+        "properties": {
+          "storage": {
+            "type": "string",
+            "const": "memory",
+            "title": "Storage"
+          },
+          "selected": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiSelection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/AiProvider"
+            },
+            "type": "array",
+            "title": "Providers"
+          },
+          "active_jobs": {
+            "items": {
+              "$ref": "#/components/schemas/AiJob"
+            },
+            "type": "array",
+            "title": "Active Jobs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "storage",
+          "providers",
+          "active_jobs"
+        ],
+        "title": "AiConfig"
+      },
+      "AiConfigResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AiConfig"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "AiConfigResponse"
+      },
+      "AiJob": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "login",
+              "test",
+              "analysis"
+            ],
+            "title": "Kind"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "user_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Code"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiPrompt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expires_at": {
+            "type": "string",
+            "title": "Expires At"
+          },
+          "snapshot_seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Seq"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "overall",
+                  "economic",
+                  "growth",
+                  "experience"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "sections": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Sections"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "provider",
+          "status",
+          "expires_at"
+        ],
+        "title": "AiJob"
+      },
+      "AiJobResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AiJob"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "AiJobResponse"
+      },
+      "AiKeyRequest": {
+        "properties": {
+          "api_key": {
+            "type": "string",
+            "format": "password",
+            "title": "Api Key",
+            "writeOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "api_key"
+        ],
+        "title": "AiKeyRequest"
+      },
+      "AiModel": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "context_window": {
+            "type": "integer",
+            "title": "Context Window"
+          },
+          "reasoning": {
+            "type": "boolean",
+            "title": "Reasoning"
+          },
+          "vision": {
+            "type": "boolean",
+            "title": "Vision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "context_window",
+          "reasoning",
+          "vision"
+        ],
+        "title": "AiModel"
+      },
+      "AiPrompt": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "secret",
+              "select",
+              "manual_code"
+            ],
+            "title": "Type"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AiPromptOption"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "message"
+        ],
+        "title": "AiPrompt"
+      },
+      "AiPromptOption": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "AiPromptOption"
+      },
+      "AiProvider": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "api_key": {
+            "type": "boolean",
+            "title": "Api Key"
+          },
+          "oauth": {
+            "type": "boolean",
+            "title": "Oauth"
+          },
+          "subscription": {
+            "type": "boolean",
+            "title": "Subscription"
+          },
+          "auth_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "api_key",
+                  "oauth"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auth Type"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/AiModel"
+            },
+            "type": "array",
+            "title": "Models"
+          },
+          "last_check": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiCheck"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "api_key",
+          "oauth",
+          "subscription",
+          "models"
+        ],
+        "title": "AiProvider"
+      },
+      "AiReplyRequest": {
+        "properties": {
+          "prompt_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Prompt Id"
+          },
+          "value": {
+            "type": "string",
+            "format": "password",
+            "title": "Value",
+            "writeOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "prompt_id",
+          "value"
+        ],
+        "title": "AiReplyRequest"
+      },
+      "AiReportRequest": {
+        "properties": {
+          "snapshot_seq": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Snapshot Seq"
+          },
+          "part": {
+            "type": "string",
+            "enum": [
+              "overall",
+              "economic",
+              "growth",
+              "experience"
+            ],
+            "title": "Part"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "snapshot_seq",
+          "part"
+        ],
+        "title": "AiReportRequest"
+      },
+      "AiSelection": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Provider"
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "model"
+        ],
+        "title": "AiSelection"
+      },
+      "AnswerData": {
+        "properties": {
+          "question_key": {
+            "type": "string",
+            "title": "Question Key"
+          },
+          "states": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "States"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question_key",
+          "states"
+        ],
+        "title": "AnswerData"
+      },
+      "AnswerItem": {
+        "properties": {
+          "offer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offer Id"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/FieldAnswer"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Fields"
+          }
+        },
+        "type": "object",
+        "title": "AnswerItem"
+      },
+      "AnswerRequest": {
+        "properties": {
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/AnswerItem"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Answers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "answers"
+        ],
+        "title": "AnswerRequest"
+      },
+      "AnswerResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AnswerData"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/DecisionEcho"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "decision"
+        ],
+        "title": "AnswerResponse"
+      },
+      "BatchAnswerData": {
+        "properties": {
+          "questions": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Questions"
+          }
+        },
+        "type": "object",
+        "title": "BatchAnswerData"
+      },
+      "BatchAnswerItem": {
+        "properties": {
+          "question_key": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Question Key"
+          },
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/AnswerItem"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Answers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question_key",
+          "answers"
+        ],
+        "title": "BatchAnswerItem",
+        "description": "单题草稿：answers 语义与单题端点完全一致（每 Offer 至多一条）。"
+      },
+      "BatchAnswerRequest": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BatchAnswerItem"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "minItems": 1,
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "BatchAnswerRequest",
+        "description": "多题草稿一次性提交（「生成对比报告」路径）：同一事务内逐题校验写入，\n全部成功后只重算一次、只落一条快照。任一题校验失败整批拒绝（原子，\n此时尚无任何写入），错误 details 附 question_key 供前端定位。"
+      },
+      "BatchAnswerResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/BatchAnswerData"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/DecisionEcho"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "decision"
+        ],
+        "title": "BatchAnswerResponse"
+      },
+      "DecisionEcho": {
+        "properties": {
+          "snapshot_seq": {
+            "type": "integer",
+            "title": "Snapshot Seq"
+          },
+          "ranking_top_offer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ranking Top Offer Id"
+          },
+          "overall_scores": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Overall Scores"
+          },
+          "weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Weights"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshot_seq"
+        ],
+        "title": "DecisionEcho",
+        "description": "写入响应中的最新报告摘要（与结果页同一快照产出）。\n\nranking_top_offer_id 是综合评分第一的 Offer；overall_scores 以\noffer_id 字符串为键。"
+      },
+      "DeletedResource": {
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "DeletedResource"
+      },
+      "DeletedResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DeletedResource"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "DeletedResponse"
+      },
+      "DueDiligenceItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "offer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offer Id"
+          },
+          "question_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question Key"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "suggested_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Source"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "done",
+              "dismissed"
+            ],
+            "title": "Status"
+          },
+          "still_relevant": {
+            "type": "boolean",
+            "title": "Still Relevant",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "content",
+          "status"
+        ],
+        "title": "DueDiligenceItem"
+      },
+      "DueDiligencePatchRequest": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "done",
+              "dismissed"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "DueDiligencePatchRequest"
+      },
+      "DueDiligencePatchResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DueDiligenceItem"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "DueDiligencePatchResponse"
+      },
+      "DueDiligenceResponse": {
+        "properties": {
+          "data": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/DueDiligenceItem"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "DueDiligenceResponse"
+      },
+      "FactPatch": {
+        "properties": {
+          "field_key": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Field Key"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field_key",
+          "value"
+        ],
+        "title": "FactPatch"
+      },
+      "FactResource": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "known"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "reliability": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reliability"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source"
+        ],
+        "title": "FactResource"
+      },
+      "FieldAnswer": {
+        "properties": {
+          "field_key": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Field Key"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "known",
+              "unknown",
+              "need_confirmation",
+              "not_applicable"
+            ],
+            "title": "Status"
+          },
+          "value": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field_key",
+          "status"
+        ],
+        "title": "FieldAnswer",
+        "description": "field-level 作答契约：composite 问题内部各字段状态独立表达。\n\nknown → value 必填，source 可选（缺省 user_provided，显式携带则校验来源表）；\nunknown → value 必须为空；\nnot_applicable → 依赖字段不适用，value/source 必须为空；\nneed_confirmation → value 可携带候选值，source 可选（同上缺省）。\n未提交的 output 不创建 RawFact（\"没问到\"≠\"问过但不知道\"）。"
+      },
+      "FieldBoundsResource": {
+        "properties": {
+          "min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min"
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max"
+          }
+        },
+        "type": "object",
+        "title": "FieldBoundsResource"
+      },
+      "FieldRulesResource": {
+        "properties": {
+          "required_core_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Required Core Fields"
+          },
+          "bounds": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FieldBoundsResource"
+            },
+            "type": "object",
+            "title": "Bounds"
+          }
+        },
+        "type": "object",
+        "title": "FieldRulesResource",
+        "description": "字段注册表的 UI 契约（fields.yaml 唯一事实源，前端禁止手抄）。"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HistoryItem": {
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "title": "Seq"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "trigger_type": {
+            "type": "string",
+            "title": "Trigger Type"
+          },
+          "top_offer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Offer Id"
+          },
+          "top_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "seq",
+          "created_at",
+          "trigger_type"
+        ],
+        "title": "HistoryItem"
+      },
+      "HistoryResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryItem"
+            },
+            "type": "array",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "HistoryResponse"
+      },
+      "HousingModuleView": {
+        "properties": {
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "grade": {
+            "type": "string",
+            "title": "Grade",
+            "default": "待补充"
+          },
+          "down_payment": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Down Payment"
+          },
+          "down_payment_years": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Down Payment Years"
+          },
+          "payment_income_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Income Ratio"
+          },
+          "monthly_payment": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly Payment"
+          },
+          "welfare_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Welfare Annual"
+          },
+          "signing_bonus": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signing Bonus"
+          }
+        },
+        "type": "object",
+        "title": "HousingModuleView"
+      },
+      "IncomeBreakdown": {
+        "properties": {
+          "entry_gross": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Gross"
+          },
+          "entry_net": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Net"
+          },
+          "guaranteed_gross": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guaranteed Gross"
+          },
+          "guaranteed_net": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guaranteed Net"
+          },
+          "bonus_gross": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bonus Gross"
+          },
+          "bonus_net": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bonus Net"
+          },
+          "cash_subsidies_gross": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Subsidies Gross"
+          },
+          "annual_cash_gross": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annual Cash Gross"
+          },
+          "annual_cash_net": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annual Cash Net"
+          },
+          "hf_personal": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hf Personal"
+          },
+          "hf_employer": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hf Employer"
+          },
+          "in_kind": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "In Kind"
+          },
+          "annual_benefits": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annual Benefits"
+          },
+          "recurring_total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recurring Total"
+          },
+          "entry_tax_method": {
+            "type": "string",
+            "title": "Entry Tax Method",
+            "default": "并入综合所得，按入职年度与常规年度总税差估算"
+          },
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Assumptions"
+          }
+        },
+        "type": "object",
+        "title": "IncomeBreakdown"
+      },
+      "InsuranceItemView": {
+        "properties": {
+          "item": {
+            "type": "string",
+            "title": "Item"
+          },
+          "personal": {
+            "type": "number",
+            "title": "Personal"
+          },
+          "employer": {
+            "type": "number",
+            "title": "Employer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item",
+          "personal",
+          "employer"
+        ],
+        "title": "InsuranceItemView"
+      },
+      "InsuranceModuleView": {
+        "properties": {
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "grade": {
+            "type": "string",
+            "title": "Grade",
+            "default": "待补充"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InsuranceItemView"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "personal_monthly": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Personal Monthly"
+          },
+          "employer_monthly": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employer Monthly"
+          },
+          "total_monthly": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Monthly"
+          }
+        },
+        "type": "object",
+        "title": "InsuranceModuleView"
+      },
+      "MetaResource": {
+        "properties": {
+          "supported_cities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Supported Cities"
+          },
+          "city_tiers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "City Tiers"
+          },
+          "preference_questionnaire": {
+            "$ref": "#/components/schemas/PreferenceQuestionnaireResource"
+          },
+          "default_weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Default Weights"
+          },
+          "field_rules": {
+            "$ref": "#/components/schemas/FieldRulesResource"
+          }
+        },
+        "type": "object",
+        "required": [
+          "preference_questionnaire"
+        ],
+        "title": "MetaResource"
+      },
+      "MetaResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MetaResource"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "MetaResponse"
+      },
+      "MonthSalaryRowView": {
+        "properties": {
+          "month": {
+            "type": "integer",
+            "title": "Month"
+          },
+          "tax_pre": {
+            "type": "number",
+            "title": "Tax Pre"
+          },
+          "tax": {
+            "type": "number",
+            "title": "Tax"
+          },
+          "after_tax": {
+            "type": "number",
+            "title": "After Tax"
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "tax_pre",
+          "tax",
+          "after_tax"
+        ],
+        "title": "MonthSalaryRowView"
+      },
+      "OfferCreateRequest": {
+        "properties": {},
+        "additionalProperties": false,
+        "type": "object",
+        "title": "OfferCreateRequest"
+      },
+      "OfferListResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/OfferResource"
+            },
+            "type": "array",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "OfferListResponse"
+      },
+      "OfferMutationResponse": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OfferResource"
+              },
+              {
+                "$ref": "#/components/schemas/DeletedResource"
+              }
+            ],
+            "title": "Data"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/DecisionEcho"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "decision"
+        ],
+        "title": "OfferMutationResponse"
+      },
+      "OfferPatchRequest": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/FactPatch"
+            },
+            "type": "array",
+            "maxItems": 80,
+            "title": "Facts"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version"
+        ],
+        "title": "OfferPatchRequest"
+      },
+      "OfferQuestionState": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "unanswered"
+          },
+          "values": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Values"
+          },
+          "statuses": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Statuses"
+          },
+          "prefill": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Prefill"
+          }
+        },
+        "type": "object",
+        "title": "OfferQuestionState"
+      },
+      "OfferReportView": {
+        "properties": {
+          "offer_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Offer Id"
+          },
+          "company": {
+            "type": "string",
+            "title": "Company"
+          },
+          "position": {
+            "type": "string",
+            "title": "Position"
+          },
+          "display_order": {
+            "type": "integer",
+            "title": "Display Order"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "monthly_after_tax": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly After Tax"
+          },
+          "overall_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overall Score"
+          },
+          "overall_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overall Rank"
+          },
+          "dimension_scores": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Dimension Scores"
+          },
+          "effective_weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Effective Weights"
+          },
+          "score_contributions": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Score Contributions"
+          },
+          "key_numbers": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Key Numbers"
+          },
+          "sub_scores": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Sub Scores"
+          },
+          "sub_metrics": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Sub Metrics"
+          },
+          "sub_details": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Sub Details"
+          },
+          "missing_core": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Core"
+          },
+          "known_optional": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Known Optional"
+          },
+          "input_values": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Input Values"
+          },
+          "city_data_as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City Data As Of"
+          },
+          "compliance_alert": {
+            "type": "boolean",
+            "title": "Compliance Alert",
+            "default": false
+          },
+          "salary": {
+            "$ref": "#/components/schemas/SalaryModuleView"
+          },
+          "insurance": {
+            "$ref": "#/components/schemas/InsuranceModuleView"
+          },
+          "housing": {
+            "$ref": "#/components/schemas/HousingModuleView"
+          }
+        },
+        "type": "object",
+        "required": [
+          "offer_id",
+          "company",
+          "position",
+          "display_order",
+          "salary",
+          "insurance",
+          "housing"
+        ],
+        "title": "OfferReportView"
+      },
+      "OfferResetRequest": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version"
+        ],
+        "title": "OfferResetRequest"
+      },
+      "OfferResource": {
+        "properties": {
+          "offer_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Offer Id"
+          },
+          "display_order": {
+            "type": "integer",
+            "title": "Display Order"
+          },
+          "company": {
+            "type": "string",
+            "title": "Company"
+          },
+          "position": {
+            "type": "string",
+            "title": "Position"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "facts": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FactResource"
+            },
+            "type": "object",
+            "title": "Facts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "offer_id",
+          "display_order",
+          "company",
+          "position",
+          "version"
+        ],
+        "title": "OfferResource"
+      },
+      "OptionItem": {
+        "properties": {
+          "value": {
+            "title": "Value"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "label"
+        ],
+        "title": "OptionItem"
+      },
+      "ParitySolution": {
+        "properties": {
+          "lever": {
+            "type": "string",
+            "const": "monthly_base",
+            "title": "Lever",
+            "default": "monthly_base"
+          },
+          "target_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Id"
+          },
+          "leader_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Leader Id"
+          },
+          "leader_score": {
+            "type": "number",
+            "title": "Leader Score"
+          },
+          "target_current_score": {
+            "type": "number",
+            "title": "Target Current Score"
+          },
+          "current_value": {
+            "type": "number",
+            "title": "Current Value"
+          },
+          "required_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Value"
+          },
+          "delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_id",
+          "leader_id",
+          "leader_score",
+          "target_current_score",
+          "current_value"
+        ],
+        "title": "ParitySolution",
+        "description": "反解追平点：目标 Offer 的某项输入谈到多少，展示综合分追平当前第一名。\nrequired_value=None 表示在字段上界内仅靠该杠杆无法追平。"
+      },
+      "PortableDecisionInput": {
+        "properties": {
+          "offers": {
+            "items": {
+              "$ref": "#/components/schemas/PortableOfferInput"
+            },
+            "type": "array",
+            "title": "Offers"
+          },
+          "preferences": {
+            "$ref": "#/components/schemas/UserPreferenceInput"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "offers",
+          "preferences"
+        ],
+        "title": "PortableDecisionInput"
+      },
+      "PortableOfferInput": {
+        "properties": {
+          "offer_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Offer Id"
+          },
+          "display_order": {
+            "type": "integer",
+            "title": "Display Order"
+          },
+          "company": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Company",
+            "default": ""
+          },
+          "position": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Position",
+            "default": ""
+          },
+          "facts": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RawFactInput"
+            },
+            "type": "object",
+            "title": "Facts"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "offer_id",
+          "display_order"
+        ],
+        "title": "PortableOfferInput"
+      },
+      "PreferenceAnswer": {
+        "properties": {
+          "question_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Question Id"
+          },
+          "choice": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Choice"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question_id",
+          "choice"
+        ],
+        "title": "PreferenceAnswer"
+      },
+      "PreferenceDimensionResource": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "description"
+        ],
+        "title": "PreferenceDimensionResource"
+      },
+      "PreferenceMutationResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PreferenceResource"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/DecisionEcho"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "decision"
+        ],
+        "title": "PreferenceMutationResponse"
+      },
+      "PreferencePutRequest": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "default": 1
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "questionnaire",
+              "manual"
+            ],
+            "title": "Source",
+            "default": "questionnaire"
+          },
+          "questionnaire_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Questionnaire Version"
+          },
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/PreferenceAnswer"
+            },
+            "type": "array",
+            "title": "Answers"
+          },
+          "weights": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weights"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PreferencePutRequest",
+        "description": "偏好写入：问卷计算权重，或提交手动权重及可选问卷答案。"
+      },
+      "PreferenceQuestionOption": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "label"
+        ],
+        "title": "PreferenceQuestionOption"
+      },
+      "PreferenceQuestionResource": {
+        "properties": {
+          "question_id": {
+            "type": "string",
+            "title": "Question Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "pairwise",
+              "calibration",
+              "single"
+            ],
+            "title": "Kind"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "left_dimension": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Left Dimension"
+          },
+          "right_dimension": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Right Dimension"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/PreferenceQuestionOption"
+            },
+            "type": "array",
+            "title": "Options"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question_id",
+          "kind",
+          "prompt"
+        ],
+        "title": "PreferenceQuestionResource"
+      },
+      "PreferenceQuestionnaireResource": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "subtitle": {
+            "type": "string",
+            "title": "Subtitle"
+          },
+          "estimated_minutes": {
+            "type": "integer",
+            "title": "Estimated Minutes"
+          },
+          "dimensions": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PreferenceDimensionResource"
+            },
+            "type": "object",
+            "title": "Dimensions"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/PreferenceQuestionResource"
+            },
+            "type": "array",
+            "title": "Questions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "title",
+          "subtitle",
+          "estimated_minutes"
+        ],
+        "title": "PreferenceQuestionnaireResource"
+      },
+      "PreferenceResource": {
+        "properties": {
+          "weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Weights"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "default": 0
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "default",
+              "questionnaire",
+              "manual"
+            ],
+            "title": "Source",
+            "default": "questionnaire"
+          },
+          "questionnaire_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Questionnaire Version"
+          },
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/PreferenceAnswer"
+            },
+            "type": "array",
+            "title": "Answers"
+          }
+        },
+        "type": "object",
+        "title": "PreferenceResource"
+      },
+      "PreferenceResponse": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PreferenceResource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decision": {
+            "$ref": "#/components/schemas/DecisionEcho"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "title": "PreferenceResponse"
+      },
+      "QuestionArea": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "round": {
+            "type": "integer",
+            "title": "Round",
+            "default": 1
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/RenderedQuestion"
+            },
+            "type": "array",
+            "title": "Questions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "QuestionArea",
+        "description": "按板块/轮次分组的问题目录节点。"
+      },
+      "QuestionsCatalogData": {
+        "properties": {
+          "phase": {
+            "type": "string",
+            "title": "Phase",
+            "default": "completion"
+          },
+          "areas": {
+            "items": {
+              "$ref": "#/components/schemas/QuestionArea"
+            },
+            "type": "array",
+            "title": "Areas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "areas"
+        ],
+        "title": "QuestionsCatalogData"
+      },
+      "QuestionsCatalogResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/QuestionsCatalogData"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "QuestionsCatalogResponse"
+      },
+      "RawFactInput": {
+        "properties": {
+          "field_key": {
+            "type": "string",
+            "title": "Field Key"
+          },
+          "value": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "known",
+              "unknown",
+              "need_confirmation",
+              "not_applicable",
+              "inferred"
+            ],
+            "title": "Status"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "reliability": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reliability"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "required": [
+          "field_key",
+          "status",
+          "source"
+        ],
+        "title": "RawFactInput"
+      },
+      "RenderField": {
+        "properties": {
+          "field_key": {
+            "type": "string",
+            "title": "Field Key"
+          },
+          "value_type": {
+            "type": "string",
+            "title": "Value Type"
+          },
+          "evidence_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Category"
+          },
+          "allowed_sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Sources"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/OptionItem"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "default_value": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Value"
+          },
+          "ui_group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ui Group"
+          },
+          "ui_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ui Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field_key",
+          "value_type"
+        ],
+        "title": "RenderField"
+      },
+      "RenderedQuestion": {
+        "properties": {
+          "question_key": {
+            "type": "string",
+            "title": "Question Key"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "comparison_mode": {
+            "type": "string",
+            "title": "Comparison Mode"
+          },
+          "answer_type": {
+            "type": "string",
+            "title": "Answer Type"
+          },
+          "unknown_allowed": {
+            "type": "boolean",
+            "title": "Unknown Allowed",
+            "default": true
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/RenderField"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "offers": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/OfferQuestionState"
+            },
+            "type": "object",
+            "title": "Offers"
+          },
+          "recommended_sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Recommended Sources"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question_key",
+          "prompt",
+          "comparison_mode",
+          "answer_type"
+        ],
+        "title": "RenderedQuestion"
+      },
+      "ReportArchive": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "const": "myoffer-input-v5",
+            "title": "Format",
+            "default": "myoffer-input-v5"
+          },
+          "schema_version": {
+            "type": "integer",
+            "const": 5,
+            "title": "Schema Version",
+            "default": 5
+          },
+          "inputs": {
+            "$ref": "#/components/schemas/PortableDecisionInput"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inputs"
+        ],
+        "title": "ReportArchive"
+      },
+      "ReportRestoreRequest": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "title": "Format"
+          },
+          "schema_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Version"
+          },
+          "inputs": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PortableDecisionInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "format"
+        ],
+        "title": "ReportRestoreRequest"
+      },
+      "ReportScenarioRequest": {
+        "properties": {
+          "snapshot_seq": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Snapshot Seq"
+          },
+          "offer_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Offer Id"
+          },
+          "monthly_base": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1000000.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly Base"
+          },
+          "bonus_factor": {
+            "type": "number",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Bonus Factor",
+            "default": 1
+          },
+          "weekly_work_hours": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 168.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekly Work Hours"
+          },
+          "commute_minutes": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 240.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commute Minutes"
+          },
+          "weights": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weights"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshot_seq",
+          "offer_id"
+        ],
+        "title": "ReportScenarioRequest"
+      },
+      "ReportScenarioSolveRequest": {
+        "properties": {
+          "snapshot_seq": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Snapshot Seq"
+          },
+          "offer_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Offer Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshot_seq",
+          "offer_id"
+        ],
+        "title": "ReportScenarioSolveRequest"
+      },
+      "ResultResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ResultView"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "ResultResponse"
+      },
+      "ResultView": {
+        "properties": {
+          "snapshot_seq": {
+            "type": "integer",
+            "title": "Snapshot Seq"
+          },
+          "computed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Computed At"
+          },
+          "rule_version": {
+            "type": "string",
+            "title": "Rule Version"
+          },
+          "trigger_type": {
+            "type": "string",
+            "title": "Trigger Type"
+          },
+          "weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Weights"
+          },
+          "ranking": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Ranking"
+          },
+          "overall_scores": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Overall Scores"
+          },
+          "city_data_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City Data Version"
+          },
+          "offers": {
+            "items": {
+              "$ref": "#/components/schemas/OfferReportView"
+            },
+            "type": "array",
+            "title": "Offers"
+          },
+          "insights": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Insights"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "default": ""
+          },
+          "attribution": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Attribution"
+          },
+          "comparison_note": {
+            "type": "string",
+            "title": "Comparison Note",
+            "default": ""
+          },
+          "tradeoff": {
+            "type": "string",
+            "title": "Tradeoff",
+            "default": ""
+          },
+          "sensitivity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SensitivityView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "excluded_offers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Excluded Offers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshot_seq",
+          "computed_at",
+          "rule_version",
+          "trigger_type"
+        ],
+        "title": "ResultView",
+        "description": "八模块对比报告（竞品对齐口径）。\n\nweights：决策维度权重（问卷产出）；ranking：综合评分降序的 offer id；\ninsights：模块 key → 服务端生成的洞察文案；\ncity_data_version：城市参考数据（费率/房价/生活成本）的版本标注。"
+      },
+      "ResumeData": {
+        "properties": {
+          "phase": {
+            "type": "string",
+            "const": "completion",
+            "title": "Phase",
+            "default": "completion"
+          }
+        },
+        "type": "object",
+        "title": "ResumeData"
+      },
+      "ResumeResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ResumeData"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/DecisionEcho"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "decision"
+        ],
+        "title": "ResumeResponse"
+      },
+      "SalaryModuleView": {
+        "properties": {
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "grade": {
+            "type": "string",
+            "title": "Grade",
+            "default": "待补充"
+          },
+          "income": {
+            "$ref": "#/components/schemas/IncomeBreakdown"
+          },
+          "monthly_rows": {
+            "items": {
+              "$ref": "#/components/schemas/MonthSalaryRowView"
+            },
+            "type": "array",
+            "title": "Monthly Rows"
+          },
+          "monthly_after_tax_avg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly After Tax Avg"
+          },
+          "annual_after_tax": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annual After Tax"
+          },
+          "annual_bonus_after_tax": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annual Bonus After Tax"
+          },
+          "bonus_tax_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bonus Tax Method"
+          },
+          "signing_bonus_after_tax": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signing Bonus After Tax"
+          },
+          "hf_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hf Annual"
+          },
+          "annual_tax": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annual Tax"
+          },
+          "welfare_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Welfare Annual"
+          },
+          "annual_with_welfare": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annual With Welfare"
+          }
+        },
+        "type": "object",
+        "title": "SalaryModuleView"
+      },
+      "ScenarioSolveResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ParitySolution"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "ScenarioSolveResponse"
+      },
+      "SensitivityFlip": {
+        "properties": {
+          "dimension": {
+            "type": "string",
+            "title": "Dimension"
+          },
+          "current_weight": {
+            "type": "number",
+            "title": "Current Weight"
+          },
+          "flip_weight": {
+            "type": "number",
+            "title": "Flip Weight"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down"
+            ],
+            "title": "Direction"
+          },
+          "overtaken_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Overtaken By"
+          },
+          "ties": {
+            "type": "boolean",
+            "title": "Ties",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "dimension",
+          "current_weight",
+          "flip_weight",
+          "direction",
+          "overtaken_by"
+        ],
+        "title": "SensitivityFlip",
+        "description": "某个维度的权重调到 flip_weight 时，当前第一名不再是唯一第一。"
+      },
+      "SensitivityView": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "stable",
+              "steady",
+              "moderate",
+              "fragile",
+              "tie"
+            ],
+            "title": "Status"
+          },
+          "leader_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leader Id"
+          },
+          "nearest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SensitivityFlip"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flips": {
+            "items": {
+              "$ref": "#/components/schemas/SensitivityFlip"
+            },
+            "type": "array",
+            "title": "Flips"
+          },
+          "margin": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin"
+          },
+          "weight_min": {
+            "type": "number",
+            "title": "Weight Min",
+            "default": 0.05
+          },
+          "weight_max": {
+            "type": "number",
+            "title": "Weight Max",
+            "default": 0.9
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "SensitivityView",
+        "description": "排名对「偏好权重」的敏感性。status：stable 整个可选权重平面内都不变；\nsteady 距翻转边界 ≥ 20 个百分点；moderate 10–20；fragile < 10；tie 当前就并列。\nmargin 是当前权重到翻转边界的最短「总变差距离」——把多少个百分点从一个\n维度挪到另一个维度（二维全向扫描，不限于单轴）；stable 时为 None。"
+      },
+      "SessionCreateRequest": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "title": "SessionCreateRequest"
+      },
+      "SessionResource": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "phase": {
+            "type": "string",
+            "title": "Phase",
+            "default": "completion"
+          },
+          "offer_count": {
+            "type": "integer",
+            "title": "Offer Count",
+            "default": 0
+          },
+          "latest_snapshot_seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Snapshot Seq"
+          },
+          "pending_confirmations": {
+            "type": "integer",
+            "title": "Pending Confirmations",
+            "default": 0
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SessionResource"
+      },
+      "SessionResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SessionResource"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "SessionResponse"
+      },
+      "StopData": {
+        "properties": {
+          "phase": {
+            "type": "string",
+            "const": "results",
+            "title": "Phase",
+            "default": "results"
+          }
+        },
+        "type": "object",
+        "title": "StopData"
+      },
+      "StopResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StopData"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/DecisionEcho"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "decision"
+        ],
+        "title": "StopResponse"
+      },
+      "TelemetryBatchRequest": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/TelemetryEventIn"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Events"
+          }
+        },
+        "type": "object",
+        "required": [
+          "events"
+        ],
+        "title": "TelemetryBatchRequest"
+      },
+      "TelemetryBatchResponse": {
+        "properties": {
+          "data": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "TelemetryBatchResponse"
+      },
+      "TelemetryEventIn": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "client_ts": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Ts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type"
+        ],
+        "title": "TelemetryEventIn"
+      },
+      "UserPreferenceInput": {
+        "properties": {
+          "weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Weights"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "default",
+              "questionnaire",
+              "manual"
+            ],
+            "title": "Source",
+            "default": "default"
+          },
+          "questionnaire_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Questionnaire Version"
+          },
+          "answers": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Answers"
+          },
+          "buy_house_intent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buy House Intent",
+            "default": "consider"
+          }
+        },
+        "type": "object",
+        "title": "UserPreferenceInput",
+        "description": "偏好权重及生成来源。\n\nsource / answers 只用于解释与审计，不参与评分；buy_house_intent 是\n问卷尾部的用户级情境题（consider/not_consider/undecided）；\n未作答时默认按考虑买房计算。"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

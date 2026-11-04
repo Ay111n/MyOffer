@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
-  clearDraftsForSession, draftKey, hasUnsubmittedDrafts, loadDraft, loadDraftsForSession, saveDraft,
+  clearAllDrafts, clearDraftsForSession, draftKey, hasUnsubmittedDrafts, listOrphanDraftSessions,
+  loadDraft, loadDraftsForSession, migrateDraftsBetweenSessions, saveDraft,
 } from "./draft-storage";
 
 describe("draft-storage（未提交草稿的 localStorage 持久化 + 24h 过期）", () => {
@@ -69,5 +70,53 @@ describe("draft-storage（未提交草稿的 localStorage 持久化 + 24h 过期
     clearDraftsForSession("s1");
     expect(loadDraftsForSession("s1")).toEqual({});
     expect(loadDraft("s2", "q1")).toEqual({ c: 1 });
+  });
+
+  it("listOrphanDraftSessions 列出含内容的旧会话，排除当前会话/空骨架/过期草稿", () => {
+    saveDraft("old-1", "q1", { o1: { f1: { status: "known", value: 1 } } });
+    saveDraft("current", "q1", { o1: { f1: { status: "known", value: 2 } } });
+    saveDraft("empty-sid", "q1", { o1: {} }); // 空骨架不算
+    localStorage.setItem(
+      draftKey("expired", "q1"),
+      JSON.stringify({ t: Date.now() - 25 * 3600_000, v: { o1: { f1: { status: "known", value: 1 } } } }),
+    );
+    expect(listOrphanDraftSessions("current")).toEqual(["old-1"]);
+    // 没有当前会话时，所有含内容的会话都是可恢复对象
+    expect(listOrphanDraftSessions(null)).toEqual(["old-1", "current"]);
+  });
+
+  it("listOrphanDraftSessions 按最近保存时间新→旧排序", () => {
+    localStorage.setItem(draftKey("older", "q1"), JSON.stringify({ t: Date.now() - 5000, v: { o1: { f1: { status: "known", value: 1 } } } }));
+    localStorage.setItem(draftKey("newer", "q1"), JSON.stringify({ t: Date.now(), v: { o1: { f1: { status: "known", value: 1 } } } }));
+    expect(listOrphanDraftSessions("current")).toEqual(["newer", "older"]);
+  });
+
+  it("migrateDraftsBetweenSessions 按 remap 重写 offer id 并删除旧键", () => {
+    saveDraft("from", "q1", { oldA: { f1: { status: "known", value: 1 } }, oldB: { f2: { status: "known", value: 2 } } });
+    migrateDraftsBetweenSessions("from", "to", (oid) => ({ oldA: "newA", oldB: "newB" }[oid] ?? null));
+    expect(loadDraftsForSession("from")).toEqual({});
+    expect(loadDraft("to", "q1")).toEqual({
+      newA: { f1: { status: "known", value: 1 } },
+      newB: { f2: { status: "known", value: 2 } },
+    });
+  });
+
+  it("migrateDraftsBetweenSessions 不覆盖新会话已有条目，remap 不到的放弃", () => {
+    saveDraft("to", "q1", { newA: { existing: { status: "known", value: 9 } } });
+    saveDraft("from", "q1", {
+      oldA: { f1: { status: "known", value: 1 } },
+      unknown: { f2: { status: "known", value: 2 } },
+    });
+    migrateDraftsBetweenSessions("from", "to", (oid) => (oid === "oldA" ? "newA" : null));
+    expect(loadDraft("to", "q1")).toEqual({ newA: { existing: { status: "known", value: 9 } } });
+    expect(loadDraftsForSession("from")).toEqual({});
+  });
+
+  it("clearAllDrafts 清掉全部会话的草稿", () => {
+    saveDraft("s1", "q1", { a: 1 });
+    saveDraft("s2", "q1", { b: 1 });
+    clearAllDrafts();
+    expect(loadDraftsForSession("s1")).toEqual({});
+    expect(loadDraftsForSession("s2")).toEqual({});
   });
 });

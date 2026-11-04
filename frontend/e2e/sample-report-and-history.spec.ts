@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { fillExampleFactsViaApi } from "./helpers";
 
 /**
  * 第二轮功能的 E2E 固化：示例报告直达闭环 + 历史版本回看 + 导出导入往返。
@@ -76,7 +77,9 @@ test("导出导入往返保留身份名", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("button", { name: /Offer B.*0\/7/ })).toBeVisible();
   await page.getByRole("textbox", { name: "Offer A 的公司名称" }).fill("字节跳动");
-  await page.getByRole("button", { name: "填入示例数据" }).click();
+  await page.getByRole("button", { name: "经济回报", exact: true }).click(); // 点别处触发失焦保存
+  await expect(page.getByRole("button", { name: /字节跳动/ })).toBeVisible({ timeout: 10_000 });
+  await fillExampleFactsViaApi(page);
   await expect(page.getByRole("button", { name: /字节跳动.*7\/7/ })).toBeVisible({ timeout: 10_000 });
 
   // UI 导出为 JSON 下载

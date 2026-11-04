@@ -18,20 +18,121 @@ export function preferenceQuestionnaireDraftKey(sessionId: string): string {
   return `${PREFERENCE_DRAFT_PREFIX}${sessionId}`;
 }
 
-/** 清空当前会话的问卷草稿（保存成功 / 重新回答时调用）。 */
-export function clearQuestionnaireDraft(sessionId: string): void {
-  if (typeof window === "undefined") return;
+/** 问卷草稿的本地持久化（localStorage，{t,v} 包裹 + 24h TTL，与 offer 草稿
+ *  lib/draft-storage.ts 同构）。此前存 sessionStorage——标签页作用域，换/关
+ *  标签即丢，会话失效后的恢复迁移也依赖同标签存活（2026-10-28 反馈）；
+ *  改 localStorage 后跨标签、误关浏览器都可恢复。 */
+const QUESTIONNAIRE_DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
+
+export type QuestionnaireDraft = {
+  version: string;
+  answers: PreferenceAnswer[];
+  currentIndex?: number;
+};
+
+type WrappedDraft = { t: number; v: QuestionnaireDraft };
+
+function readDraftStore(): Storage | null {
+  if (typeof window === "undefined") return null;
   try {
-    sessionStorage.removeItem(preferenceQuestionnaireDraftKey(sessionId));
+    return window.localStorage;
   } catch {
-    // 存储不可用时无草稿可清
+    return null; // localStorage 不可用（隐私模式等）：问卷照常作答，只是草稿不持久化
   }
+}
+
+/** 读取问卷草稿；过期/损坏一律返回 null（读取时顺手淘汰）。 */
+export function loadQuestionnaireDraft(sessionId: string): QuestionnaireDraft | null {
+  const store = readDraftStore();
+  if (!store) return null;
+  const key = preferenceQuestionnaireDraftKey(sessionId);
+  let raw: string | null = null;
+  try {
+    raw = store.getItem(key);
+  } catch {
+    return null;
+  }
+  if (raw == null) return null;
+  try {
+    const wrapped = JSON.parse(raw) as WrappedDraft;
+    if (!wrapped || typeof wrapped !== "object" || !wrapped.v
+      || typeof wrapped.v.version !== "string" || !Array.isArray(wrapped.v.answers)) {
+      store.removeItem(key); // 内容损坏：当作无草稿
+      return null;
+    }
+    if (Date.now() - wrapped.t > QUESTIONNAIRE_DRAFT_TTL_MS) {
+      store.removeItem(key); // 过期草稿直接丢弃，不再恢复
+      return null;
+    }
+    return wrapped.v;
+  } catch {
+    try {
+      store.removeItem(key);
+    } catch { /* 存储不可用：无从清理 */ }
+    return null;
+  }
+}
+
+export function saveQuestionnaireDraft(sessionId: string, draft: QuestionnaireDraft): void {
+  const store = readDraftStore();
+  if (!store) return;
+  try {
+    store.setItem(
+      preferenceQuestionnaireDraftKey(sessionId),
+      JSON.stringify({ t: Date.now(), v: draft } satisfies WrappedDraft),
+    );
+  } catch {
+    // 写入失败（配额满等）：内存草稿仍然工作
+  }
+}
+
+/** 清空当前会话的问卷草稿（保存成功 / 重新回答 / 放弃恢复时调用）。
+ *  localStorage 为主存储；旧版 sessionStorage 键一并尝试删除（跨版本残留）。 */
+export function clearQuestionnaireDraft(sessionId: string): void {
+  const store = readDraftStore();
+  if (store) {
+    try {
+      store.removeItem(preferenceQuestionnaireDraftKey(sessionId));
+    } catch { /* 存储不可用时无草稿可清 */ }
+  }
+  if (typeof window !== "undefined") {
+    try {
+      window.sessionStorage.removeItem(preferenceQuestionnaireDraftKey(sessionId));
+    } catch { /* 存储不可用时无草稿可清 */ }
+  }
+}
+
+/** 列出除 currentSid 外、localStorage 中仍有未过期问卷草稿的会话 id（新→旧）。
+ *  供孤儿恢复横幅使用：会话失效自动重建后，仅有问卷草稿（offer 草稿已不在）
+ *  的旧会话也要能找回偏好作答。 */
+export function listOrphanQuestionnaireSids(currentSid: string | null): string[] {
+  const store = readDraftStore();
+  if (!store) return [];
+  const found: { sid: string; t: number }[] = [];
+  try {
+    for (let i = 0; i < store.length; i += 1) {
+      const key = store.key(i);
+      if (!key || !key.startsWith(PREFERENCE_DRAFT_PREFIX)) continue;
+      const sid = key.slice(PREFERENCE_DRAFT_PREFIX.length);
+      if (!sid || sid === currentSid) continue;
+      try {
+        const wrapped = JSON.parse(store.getItem(key) ?? "") as WrappedDraft;
+        if (wrapped && typeof wrapped.t === "number"
+          && Date.now() - wrapped.t <= QUESTIONNAIRE_DRAFT_TTL_MS) {
+          found.push({ sid, t: wrapped.t });
+        }
+      } catch { /* 单条损坏不阻断扫描 */ }
+    }
+  } catch {
+    return []; // 存储不可用：无可恢复项
+  }
+  return found.sort((a, b) => b.t - a.t).map((item) => item.sid);
 }
 
 /**
  * 读取「已答完但尚未保存」的问卷作答。
  *
- * 问卷草稿随作答写入 sessionStorage，保存成功即被清除——因此草稿仍在且
+ * 问卷草稿随作答写入 localStorage，保存成功即被清除——因此草稿仍在且
  * 四题齐全，就等价于用户表达过完整偏好但还没落库。生成报告会立即消费
  * 权重，静默用默认/旧权重会偏离用户刚表达的偏好；生成入口据此提醒。
  * 版本不匹配（规则更新后的残留草稿）、答不齐或内容损坏一律返回 null。
@@ -40,27 +141,20 @@ export function readUnsavedQuestionnaireAnswers(
   sessionId: string,
   definition: PreferenceQuestionnaireResource,
 ): PreferenceAnswer[] | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = sessionStorage.getItem(preferenceQuestionnaireDraftKey(sessionId));
-    if (!raw) return null;
-    const draft = JSON.parse(raw) as { version?: unknown; answers?: unknown };
-    if (draft.version !== definition.version || !Array.isArray(draft.answers)) return null;
-    const questions = definition.questions ?? [];
-    if (questions.length === 0) return null;
-    const byId = new Map(
-      draft.answers
-        .filter((a): a is PreferenceAnswer => Boolean(a?.question_id && a?.choice))
-        .map((a) => [a.question_id as string, a.choice as string]),
-    );
-    if (!questions.every((question) => byId.has(question.question_id))) return null;
-    return questions.map((question) => ({
-      question_id: question.question_id,
-      choice: byId.get(question.question_id)!,
-    }));
-  } catch {
-    return null;
-  }
+  const draft = loadQuestionnaireDraft(sessionId);
+  if (!draft || draft.version !== definition.version) return null;
+  const questions = definition.questions ?? [];
+  if (questions.length === 0) return null;
+  const byId = new Map(
+    draft.answers
+      .filter((a): a is PreferenceAnswer => Boolean(a?.question_id && a?.choice))
+      .map((a) => [a.question_id as string, a.choice as string]),
+  );
+  if (!questions.every((question) => byId.has(question.question_id))) return null;
+  return questions.map((question) => ({
+    question_id: question.question_id,
+    choice: byId.get(question.question_id)!,
+  }));
 }
 
 /** 将服务端归一化权重按最大余数法显示为合计 100 的整数百分比。 */
@@ -89,6 +183,17 @@ export function preferenceWeightSummary(weights: Record<string, number> | null |
   return PREFERENCE_DIMENSION_ORDER
     .map((key) => `${PREFERENCE_DIMENSION_LABELS[key]} ${rounded[key] ?? 0}%`)
     .join(" • ");
+}
+
+/** 单维度权重的展示文本，与 preferenceWeightSummary 同用最大余数法——
+ *  报告页所有「你的权重 / 现在占」都必须走这里，否则 37.5% 这类值会
+ *  因四舍五入口径不同在声明行与正文之间差 1（2026-10-27 试用反馈）。 */
+export function weightPercentText(
+  weights: Record<string, number> | null | undefined,
+  key: string,
+): string {
+  const rounded = roundWeightsToPercentages(weights ?? {}, PREFERENCE_DIMENSION_ORDER);
+  return `${rounded[key] ?? 0}%`;
 }
 
 export function normalizeManualWeights(values: Record<string, string>): Record<string, number> | null {

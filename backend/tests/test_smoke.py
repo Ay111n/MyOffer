@@ -67,3 +67,20 @@ def test_meta_field_rules_match_registry():
     assert bounds["guaranteed_salary_months"]["max"] == 16
     # 非数值字段不进 bounds
     assert "city" not in bounds and "meal_plan" not in bounds
+
+
+def test_session_resource_datetimes_carry_utc_suffix():
+    """API 时间统一带时区后缀（2026-10-28 反馈）：SQLite 落库的是 naive UTC
+    文本，无后缀的 ISO 串会被前端 new Date() 当本地时间解析而慢一个时区。"""
+    from datetime import datetime
+
+    from app.schemas.api import HistoryItem
+
+    with TestClient(app) as client:
+        r = client.post("/api/v1/sessions", json={})
+        assert r.status_code == 201
+        data = r.json()["data"]
+        assert data["created_at"].endswith("Z") and data["updated_at"].endswith("Z")
+
+    naive = HistoryItem(seq=1, created_at=datetime(2026, 1, 1, 8, 0), trigger_type="batch_answered")
+    assert naive.model_dump(mode="json")["created_at"] == "2026-01-01T08:00:00Z"

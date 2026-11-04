@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useRouter } from "next/navigation";
 
 import { Compass } from "lucide-react";
-import { Button, Card, ErrorText, Spinner } from "@/components/ui";
+import { Button, Card, ErrorText, Spinner, Toast } from "@/components/ui";
 import { ChevronRight } from "@/components/guided-ui";
 import { Reveal } from "@/components/motion";
 import { OfferTabs, MAX_OFFERS } from "@/components/complete/offer-tabs";
@@ -25,6 +25,7 @@ import {
 } from "@/lib/api/hooks";
 import { useFlowStore, useHydrateSession } from "@/stores/flow-store";
 import { readApiError } from "@/lib/api/errors";
+import { SESSION_EXPIRED_FLAG } from "@/lib/api/client";
 import {
   type FieldDraft,
   type OfferResource,
@@ -35,21 +36,38 @@ import {
 } from "@/lib/api/types";
 import { useComparisonScroll } from "@/lib/use-comparison-scroll";
 import { useNavGuard } from "@/lib/use-nav-guard";
-import { loadDraftsForSession, saveDraft } from "@/lib/draft-storage";
+import {
+  clearDraftsForSession,
+  listOrphanDraftSessions,
+  loadDraftsForSession,
+  migrateDraftsBetweenSessions,
+  saveDraft,
+} from "@/lib/draft-storage";
 import { bindTelemetrySession, track } from "@/lib/telemetry";
 import { clearDemoFlag, markDemoSession } from "@/lib/demo-flag";
 import { useGenerateReport } from "@/lib/use-generate-report";
 import { EXAMPLE_DETAILS, EXAMPLE_META, EXAMPLE_OFFERS } from "@/lib/example-offers";
 import { PreferenceQuestionnaire } from "@/components/preference-questionnaire";
-import { preferenceWeightSummary, clearQuestionnaireDraft, readUnsavedQuestionnaireAnswers } from "@/lib/preference-questionnaire";
+import {
+  preferenceWeightSummary,
+  clearQuestionnaireDraft,
+  loadQuestionnaireDraft,
+  listOrphanQuestionnaireSids,
+  readUnsavedQuestionnaireAnswers,
+  saveQuestionnaireDraft,
+} from "@/lib/preference-questionnaire";
 import {
   FIELD_DEPENDENCY,
+  FIELD_VISIBILITY,
+  HIDDEN_DERIVED_FIELDS,
+  REQUIRED_FIELDS,
   dependencyTriggered,
   questionStatus,
   serverFieldDraft,
   syncFieldBounds,
   type NodeDraft,
 } from "@/components/question-parts";
+import { fieldLabel } from "@/lib/constants";
 
 /** 目录板块（questions 已归一化为数组，见 catalogAreas） */
 type NormalizedArea = QuestionArea & { questions: RenderedQuestion[] };
@@ -83,7 +101,7 @@ const DIMENSION_GROUPS = [
 
 export default function CompletePage() {
   return (
-    <Suspense fallback={<Spinner label="加载信息补全…" />}>
+    <Suspense fallback={<Spinner label="正在载入你的填写内容…" />}>
       <CompletePageInner />
     </Suspense>
   );
@@ -123,23 +141,44 @@ function CompletePageInner() {
   // 24h 过期；提交成功立即清除）——误关标签页/浏览器后重开可恢复。
   const [drafts, setDrafts] = useState<NodeDraft>(() => loadDraftsForSession(sessionId));
   const [error, setError] = useState<string | null>(null);
+  /** 非阻塞信息提示（Toast，2s 自动淡出）：通知完即逝的告知，与需要
+   *  处理直到解决的 error 分开——同一句不占页面常驻位置。 */
+  const [notice, setNotice] = useState<{ text: string; seq: number } | null>(null);
+  const noticeTimerRef = useRef(0);
+  const showNotice = useCallback((text: string) => {
+    setNotice((prev) => ({ text, seq: (prev?.seq ?? 0) + 1 }));
+  }, []);
+  useEffect(() => {
+    if (!notice) return;
+    window.clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = window.setTimeout(() => setNotice(null), 2400);
+    return () => window.clearTimeout(noticeTimerRef.current);
+  }, [notice]);
   /** 偏好小节的展开/收起。 */
   const [prefExpanded, setPrefExpanded] = useState(false);
   /** 保存成功后立即用于摘要展示，避免等待偏好查询失效/重取造成入口仍显示“开始问卷”。 */
   const [localPreference, setLocalPreference] = useState<{ sessionId: string; data: PreferenceResource } | null>(null);
+  /** 问卷已答完但尚未保存的权重（组件回调上报）；摘要卡据此显示「你的权重」。 */
+  const [previewWeights, setPreviewWeights] = useState<Record<string, number> | null>(null);
   /** 分节折叠状态，键 = `${oid}:${sectionKey}`（basics 或 area key） */
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   /** 缺失必填项定位：切到对应 Offer/板块并滚动高亮该行（见 generateReport） */
   const [missingFocus, setMissingFocus] = useState<{ oid: string; fieldKey: string } | null>(null);
   const [deletingOfferId, setDeletingOfferId] = useState<string | null>(null);
   const [resettingOfferId, setResettingOfferId] = useState<string | null>(null);
-  const [fillingExamples, setFillingExamples] = useState(false);
   /** 示例报告直达：全量示例草稿直接生成（结果页打示例横幅）。 */
   const [demoGenerating, setDemoGenerating] = useState(false);
   /** 当前标签选中的 Offer；失效（为空/已删除/换会话）时由 activeOffer 兜底到第一份 */
   const [activeOfferId, setActiveOfferId] = useState<string | null>(null);
   const autoCreateStartedRef = useRef(false);
   const hadSessionRef = useRef(false);
+
+  // ── 孤儿草稿恢复 ────────────────────────────────────────────
+  // 会话失效自动重建后，旧会话的未提交草稿仍在本机（404 中间件只解除
+  // 绑定不删数据）。当前会话完全空白时给出恢复横幅，按槽位迁移找回。
+  const [recoverableSids, setRecoverableSids] = useState<string[]>([]);
+  const [recovering, setRecovering] = useState(false);
+  const draftScanDoneRef = useRef<string | null>(null);
 
   const createSessionAutomatically = useCallback(() => {
     // sessionId 读 store 实时值而非闭包：useHydrateSession 与本函数同在一次
@@ -178,6 +217,22 @@ function CompletePageInner() {
     createSessionAutomatically();
   }, [createSessionAutomatically, sessionId]);
 
+  // 会话失效（401/404 中间件跳回首页或原地解绑重建）后给出交代：本机草稿
+  // 仍保留，恢复横幅会负责找回（2026-10-28 反馈：此前静默弹回无任何说明）。
+  // 标记由 lib/api/client.ts 写入，这里读到即清，提示只出现一次。
+  /* eslint-disable react-hooks/set-state-in-effect -- 读一次性标记并 toast，
+     与上方「换会话清残留错误」的水合类 effect 同一惯例。 */
+  useEffect(() => {
+    try {
+      if (!sessionStorage.getItem(SESSION_EXPIRED_FLAG)) return;
+      sessionStorage.removeItem(SESSION_EXPIRED_FLAG);
+      showNotice("会话已失效，本机草稿仍保留");
+    } catch {
+      // 存储不可用：跳过提示
+    }
+  }, [sessionId, showNotice]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   // 预取结果页路由。跳转走 router.push 程序化导航，不会触发 Link 预取；
   // 提前把 /results 的 RSC payload 放进缓存可缩短点击「生成对比报告」后的等待。
   // 延迟 3 s 再发起：避开与首屏关键资源抢带宽。
@@ -199,6 +254,27 @@ function CompletePageInner() {
 
   // telemetry 会话绑定（登出/切换会话时停止上报）
   useEffect(() => { bindTelemetrySession(sessionId); }, [sessionId]);
+
+  // 换会话（含 404 自动重建）时清掉上一会话的残留错误，避免「会话已恢复
+  // 而报错横幅还挂着」的自相矛盾状态。同步重置是刻意行为（水合类 effect
+  // 的同一惯例，见下方草稿恢复）。
+  /* eslint-disable react-hooks/set-state-in-effect -- 见上注释 */
+  useEffect(() => { setError(null); }, [sessionId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // 每个会话只扫描一次孤儿草稿；要求目录与 Offer 列表就绪，且当前会话
+  // 在服务端没有任何已填内容（恢复动作只补空白，不覆盖已有填写）。
+  useEffect(() => {
+    if (!sessionId || offersLoading || catalogLoading || offerList.length === 0) return;
+    if (draftScanDoneRef.current === sessionId) return;
+    draftScanDoneRef.current = sessionId;
+    const serverEmpty = offerList.every((o) => Object.keys(o.facts ?? {}).length === 0);
+    // 恢复候选 = 有 offer 草稿的孤儿会话 ∪ 有问卷草稿的孤儿会话（localStorage
+    // 扫描）：答完问卷但 offer 草稿已清的会话也要能找回偏好作答。
+    const orphanSids = new Set(serverEmpty ? listOrphanDraftSessions(sessionId) : []);
+    for (const sid of listOrphanQuestionnaireSids(sessionId)) orphanSids.add(sid);
+    setRecoverableSids([...orphanSids]);
+  }, [sessionId, offersLoading, catalogLoading, offerList]);
 
   // 归一化目录：questions 在 schema 中可缺省（default_factory），统一补齐为空数组。
   const catalogAreas: NormalizedArea[] = useMemo(
@@ -226,6 +302,41 @@ function CompletePageInner() {
   );
   const activeId = activeOffer?.offer_id ?? null;
 
+  /** 某份 Offer 还缺哪些必填项（七项口径，与 Offer 标签 x/7 同源）。 */
+  const missingRequiredOf = useCallback((oid: string) => {
+    const out: { fieldKey: string; label: string }[] = [];
+    for (const q of allQuestions) {
+      for (const field of q.fields ?? []) {
+        if (!REQUIRED_FIELDS.has(field.field_key)) continue;
+        const d = drafts[q.question_key]?.[oid]?.[field.field_key]
+          ?? serverFieldDraft(q, oid, field.field_key);
+        const filled = d?.status === "known" && d.value !== null && d.value !== "";
+        if (!filled) out.push({ fieldKey: field.field_key, label: fieldLabel(field.field_key) });
+      }
+    }
+    return out;
+  }, [allQuestions, drafts]);
+  const missingRequired = useMemo(
+    () => (activeOffer ? missingRequiredOf(activeOffer.offer_id) : []),
+    [activeOffer, missingRequiredOf],
+  );
+  const offersMissingRequired = useMemo(
+    () => offerList
+      .map((offer) => ({ offer, missing: missingRequiredOf(offer.offer_id) }))
+      .filter((item) => item.missing.length > 0),
+    [offerList, missingRequiredOf],
+  );
+
+  /** 点缺失地图的 chip：展开所在分区并滚动高亮该字段（复用深链定位机制）。 */
+  const focusMissingField = (fieldKey: string) => {
+    if (!activeOffer) return;
+    const group = DIMENSION_GROUPS.find((item) => item.fieldKeys.has(fieldKey));
+    if (group) {
+      setExpanded((prev) => ({ ...prev, [`${activeOffer.offer_id}:${group.key}`]: true }));
+    }
+    setMissingFocus({ oid: activeOffer.offer_id, fieldKey });
+  };
+
   useEffect(() => {
     if (!sessionId || catalogAreas.length === 0 || offerList.length === 0) return;
     const params = new URLSearchParams(window.location.search);
@@ -238,10 +349,8 @@ function CompletePageInner() {
       if (group || params.get("details") === "1") {
         const groupKey = group?.key ?? "economic";
         autoExpandedOffersRef.current.add(target.offer_id);
-        setExpanded((current) => ({
-          ...current,
-          ...Object.fromEntries(DIMENSION_GROUPS.map((item) => [`${target.offer_id}:${item.key}`, item.key === groupKey])),
-        }));
+        // 深链只展开目标分区，不再收起其他分区（手风琴已允许多开）
+        setExpanded((current) => ({ ...current, [`${target.offer_id}:${groupKey}`]: true }));
         if (fieldKey && group) setMissingFocus({ oid: target.offer_id, fieldKey });
       }
     }, 0);
@@ -280,42 +389,53 @@ function CompletePageInner() {
   }, [catalogAreas, drafts, offerList]);
 
   // 缺失必填项定位：等切换 Offer / 展开板块的重渲染完成后，滚动到该字段行并短暂高亮。
+  // 两个已知的时序坑都在这里兜住（2026-10-28 真实浏览器实测复现）：
+  // 1) 深链/chip 进入时表单可能仍在加载，锚点尚未渲染——重试至出现；
+  // 2) scrollIntoView(smooth) 会被分区展开的布局位移打断——滚动后校验
+  //    落点，未进入视口就再滚，避免「点了却停在原地」。
   useEffect(() => {
     if (!missingFocus) return;
-    const timer = window.setTimeout(() => {
+    let attempts = 0;
+    let timer: number;
+    const attempt = () => {
       const el = document.querySelector<HTMLElement>(
         `[data-field-anchor="${missingFocus.oid}:${missingFocus.fieldKey}"]`,
       );
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (!el) {
+        if (attempts >= 20) {
+          setMissingFocus(null);
+          return;
+        }
+        attempts += 1;
+        timer = window.setTimeout(attempt, 150);
+        return;
+      }
+      // behavior 用即时定位：smooth 在部分内嵌环境（IAB）不生效且易被
+      // 布局位移打断——「滚到位」优先于「滚得优雅」
+      el.scrollIntoView({ behavior: "auto", block: "center" });
+      window.setTimeout(() => {
+        const box = el.getBoundingClientRect();
+        const inView = box.top < window.innerHeight && box.bottom > 0;
+        if (!inView && attempts < 20) {
+          attempts += 1;
+          timer = window.setTimeout(attempt, 200);
+          return;
+        }
         el.classList.remove("field-flash");
         void el.offsetWidth; // 重启动画：连续两次点击生成时也能再次高亮
         el.classList.add("field-flash");
         window.setTimeout(() => el.classList.remove("field-flash"), 2000);
-      }
-      setMissingFocus(null);
-    }, 150);
+        setMissingFocus(null);
+      }, 250);
+    };
+    timer = window.setTimeout(attempt, 150);
     return () => window.clearTimeout(timer);
   }, [missingFocus]);
 
-  const toggleSection = useCallback((key: string, areaKey: string | null) => {
-    setExpanded((prev) => {
-      const opening = !prev[key];
-      const next = { ...prev };
-      if (opening) {
-        // 同一份 Offer 同时只展开一个板块；切换到另一个板块时先收起旧板块。
-        const separator = key.indexOf(":");
-        const offerPrefix = separator >= 0 ? key.slice(0, separator + 1) : "";
-        for (const expandedKey of Object.keys(next)) {
-          if (offerPrefix && expandedKey.startsWith(offerPrefix)) next[expandedKey] = false;
-        }
-        next[key] = true;
-        if (areaKey) track("step_enter", { step: areaKey });
-      } else {
-        next[key] = false;
-      }
-      return next;
-    });
+  // 分区展开互斥已按试用反馈移除（2026-10-27）：必填七项分散在三个分区，
+  // 互斥导致无法对照回看、来回翻找；多开后页面变长的代价由「必填缺失地图」缓解。
+  const toggleSection = useCallback((key: string) => {
+    setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
 
   const setField = useCallback((qkey: string, oid: string, fk: string, draft: FieldDraft | null) => {
@@ -335,8 +455,8 @@ function CompletePageInner() {
     [setField],
   );
 
-  /** 用示例画像构造整套草稿（blanksOnly=true 只填空白，供「填入示例数据」；
-   *  demo 模式全量填入）。offersParam 供 demo 传入补建第三份后的最新列表。
+  /** 用示例画像构造整套草稿（demo 模式全量填入，供「先看一份示例报告」）。
+   *  offersParam 供 demo 传入补建第三份后的最新列表。
    *  返回的新对象与 setDrafts 写入共享引用，供生成链路按引用一致性清理已提交草稿。 */
   const buildExampleDrafts = (blanksOnly: boolean, offersParam?: OfferResource[]): NodeDraft => {
     const targets = offersParam ?? offerList;
@@ -359,17 +479,6 @@ function CompletePageInner() {
     return next;
   };
 
-  const fillExamples = async () => {
-    if (!sessionId || fillingExamples || createOffer.isPending) return;
-    setError(null);
-    setFillingExamples(true);
-    try {
-      setDrafts(buildExampleDrafts(true));
-    } finally {
-      setFillingExamples(false);
-    }
-  };
-
   // 草稿变化 → 写 localStorage（空题删除条目；按 sessionId+questionKey 隔离；
   // 24h 过期，误关标签页后重开仍可恢复）
   useEffect(() => {
@@ -390,6 +499,11 @@ function CompletePageInner() {
   // 偏好摘要（折叠态展示；hook 必须在提前 return 之前调用）
   const preference = localPreference?.sessionId === sessionId ? localPreference.data : prefs?.data;
   const weightSummary = useMemo(() => preferenceWeightSummary(preference?.weights ?? defaultWeights ?? { economic: 0.34, growth: 0.33, experience: 0.33 }), [preference, defaultWeights]);
+  // 已答未保存时优先展示用户自己的权重，避免「默认」字样让人以为作答没生效
+  const previewSummary = useMemo(
+    () => (preference ? null : previewWeights ? preferenceWeightSummary(previewWeights) : null),
+    [preference, previewWeights],
+  );
   // 首个 Offer 分区展开后，问卷的纵向位置才稳定。
   const initialOfferId = offerList[0]?.offer_id;
   const initialSectionReady = !initialOfferId || allQuestions.length === 0
@@ -519,7 +633,7 @@ function CompletePageInner() {
       </Card>
     );
   }
-  if (offersLoading || catalogLoading) return <Spinner label="加载信息补全…" />;
+  if (offersLoading || catalogLoading) return <Spinner label="正在载入你的填写内容…" />;
   if (offersError) {
     return (
       <Card>
@@ -538,7 +652,11 @@ function CompletePageInner() {
   /** 新增一份 Offer 并立刻切到它的标签（用户点「＋」后期望直接开始填新的一份）。 */
   const addOffer = async () => {
     setError("");
-    if (offerList.length >= MAX_OFFERS) return;
+    if (offerList.length >= MAX_OFFERS) {
+      // UI 层此路不通（满 3 份时按钮已变成「清空当前 Offer」），防御式提示防静默
+      showNotice("最多同时比较 3 份 Offer。");
+      return;
+    }
     try {
       const res = await createOffer.mutateAsync({ sessionId, body: {} });
       if ("offer_id" in res.data) setActiveOfferId(res.data.offer_id);
@@ -595,6 +713,103 @@ function CompletePageInner() {
   };
 
 
+  /** 把上一份 Offer 已填内容带入当前份的空白项（不覆盖已填，与「填入示例数据」
+   *  同语义）。应届生两份 Offer 通常大同小异，几十个字段逐项重填是纯重复劳动。
+   *  只带入用户草稿与服务端已答值；方式类字段的子字段（如年终奖数值）仅在
+   *  父字段取值一致（或本次一并带入）时才跟随，避免「金额 2 万」落进「倍数」框。 */
+  const copyFromPreviousOffer = () => {
+    if (!activeOffer || !sessionId) return;
+    const candidates = offerList
+      .filter((o) => o.display_order < activeOffer.display_order)
+      .sort((a, b) => b.display_order - a.display_order);
+    const source = candidates.find((o) =>
+      Object.keys(o.facts ?? {}).length > 0
+      || Object.values(drafts).some((perOffer) => Object.keys(perOffer[o.offer_id] ?? {}).length > 0));
+    if (!source) {
+      showNotice("上一份 Offer 还没有可带入的内容。");
+      return;
+    }
+    const next: NodeDraft = { ...drafts };
+    const copiedKeys = new Set<string>();
+    let copied = 0;
+    for (const q of allQuestions) {
+      const targetMerged = mergedDraft(q, activeOffer.offer_id);
+      const sourceMerged = mergedDraft(q, source.offer_id);
+      for (const field of q.fields ?? []) {
+        const fk = field.field_key;
+        if (HIDDEN_DERIVED_FIELDS.has(fk)) continue;
+        if (targetMerged[fk] || copiedKeys.has(fk)) continue;
+        const value = sourceMerged[fk];
+        if (!value) continue;
+        const visibility = FIELD_VISIBILITY[fk];
+        if (visibility) {
+          const sp = sourceMerged[visibility.on];
+          const tp = targetMerged[visibility.on];
+          const parentConsistent = Boolean(
+            sp && sp.status === "known"
+            && (copiedKeys.has(visibility.on)
+              || (tp && tp.status === "known" && String(tp.value) === String(sp.value))),
+          );
+          if (!parentConsistent) continue;
+        }
+        const node = { ...(next[q.question_key] ?? {}) };
+        node[activeOffer.offer_id] = { ...(node[activeOffer.offer_id] ?? {}), [fk]: value };
+        next[q.question_key] = node;
+        copiedKeys.add(fk);
+        copied += 1;
+      }
+    }
+    if (copied === 0) {
+      showNotice(`${source.company || `Offer ${String.fromCharCode(64 + source.display_order)}`} 已填的内容在本份都已存在，没有可带入的空白项。`);
+      return;
+    }
+    setDrafts(next);
+  };
+
+  /** 把旧会话的本机草稿迁移进当前会话：旧 offer id 已不可考（后端随失效
+   *  会话级联删除），按草稿条目首次出现顺序对齐当前会话的 display_order
+   *  （用户通常按 A→B 顺序填写）；对不上的条目放弃。公司名/岗位在服务端
+   *  已随会话丢失，恢复后需重新命名。 */
+  const applyDraftRecovery = (oldSid: string) => {
+    if (!sessionId || recovering) return;
+    setRecovering(true);
+    try {
+      const stored = loadDraftsForSession<Record<string, Record<string, unknown>>>(oldSid);
+      const seen: string[] = [];
+      for (const perOffer of Object.values(stored)) {
+        for (const oid of Object.keys(perOffer ?? {})) {
+          if (!seen.includes(oid)) seen.push(oid);
+        }
+      }
+      const byOrder = [...offerList].sort((a, b) => a.display_order - b.display_order);
+      const remap = new Map<string, string>();
+      seen.forEach((oldOid, index) => {
+        const target = byOrder[index];
+        if (target) remap.set(oldOid, target.offer_id);
+      });
+      migrateDraftsBetweenSessions(oldSid, sessionId, (oid) => remap.get(oid) ?? null);
+      // 问卷作答草稿（localStorage，跨标签存活）一并迁移，避免答完未保存的偏好也丢
+      try {
+        const questionnaireDraft = loadQuestionnaireDraft(oldSid);
+        if (questionnaireDraft) {
+          saveQuestionnaireDraft(sessionId, questionnaireDraft);
+          clearQuestionnaireDraft(oldSid);
+        }
+      } catch { /* 存储不可用：跳过问卷迁移 */ }
+      setDrafts(loadDraftsForSession<NodeDraft>(sessionId));
+    } finally {
+      setRecovering(false);
+    }
+    setRecoverableSids((prev) => prev.filter((sid) => sid !== oldSid));
+  };
+
+  /** 放弃恢复：删除该旧会话的本机草稿与问卷缓存。 */
+  const discardRecoverable = (oldSid: string) => {
+    clearDraftsForSession(oldSid);
+    clearQuestionnaireDraft(oldSid);
+    setRecoverableSids((prev) => prev.filter((sid) => sid !== oldSid));
+  };
+
   const saveQuestionnairePrefs = async (
     answers: PreferenceAnswer[],
     questionnaireVersion: string,
@@ -603,7 +818,7 @@ function CompletePageInner() {
     setError(null);
     // 偏好查询未返回时不猜版本：误发 version:1 会与已存在的偏好行冲突（409）
     if (prefsPending) {
-      setError("偏好信息加载中，请稍候重试");
+      showNotice("偏好信息加载中，请稍候重试");
       return false;
     }
     try {
@@ -662,6 +877,33 @@ function CompletePageInner() {
           <ErrorText>无法加载问题目录：{readApiError(catalogError)}</ErrorText>
         )}
 
+        {/* ── 孤儿草稿恢复横幅（会话失效重建后出现）── */}
+        {recoverableSids.length > 0 && (
+          <Card className="border-amber-300 bg-amber-50">
+            <p className="text-sm font-semibold text-ink">检测到上次未提交的填写内容</p>
+            <p className="mt-1 text-xs leading-relaxed text-slate-600">
+              上次比较因会话失效中断，本机草稿仍在（24 小时内有效）；恢复后公司名需重新填写。
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Button
+                onClick={() => applyDraftRecovery(recoverableSids[0])}
+                disabled={recovering}
+                className="min-h-11"
+              >
+                {recovering ? "恢复中…" : "恢复到本次比较"}
+              </Button>
+              <button
+                type="button"
+                onClick={() => discardRecoverable(recoverableSids[0])}
+                disabled={recovering}
+                className="inline-flex min-h-11 items-center text-sm font-medium text-slate-500 underline-offset-4 hover:underline disabled:opacity-50"
+              >
+                放弃并删除
+              </button>
+            </div>
+          </Card>
+        )}
+
         {/* ── Offer 标签行：切换 + 添加 + 删除（≤2 份时不显示删除标识）── */}
         <OfferTabs
           offers={offerList}
@@ -676,23 +918,61 @@ function CompletePageInner() {
           onReset={resetActiveOffer}
           onDelete={removeOffer}
         />
-        <div className="-mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm text-slate-500">
-          <p>带 <span className="text-red-600">*</span> 的七项填齐后才显示综合排名；其他信息可稍后补充。</p>
-          <div className="flex flex-wrap items-center gap-x-4">
-            {nothingFilled && (
-              <button
-                type="button"
-                onClick={() => void viewExampleReport()}
-                disabled={demoGenerating || submitBatch.isPending || stop.isPending}
-                title="三份改编自公开校招信息的对比示例（公司名为虚构），覆盖报告、试算、反解等全部功能，随时可清空重来"
-                className="-my-2 inline-flex min-h-11 items-center font-medium text-blue-700 underline-offset-4 hover:underline disabled:opacity-50"
-              >
-                {demoGenerating ? "正在生成示例…" : "先看一份示例报告"}
-              </button>
-            )}
-            <button type="button" onClick={() => void fillExamples()} disabled={fillingExamples || createOffer.isPending} title="为每份 Offer 只填空白项，不覆盖已填内容" className="-my-2 inline-flex min-h-11 items-center font-medium text-blue-700 underline-offset-4 hover:underline disabled:opacity-50">{fillingExamples ? "填入中…" : "填入示例数据"}</button>
-          </div>
-        </div>
+        {/* 同一水平栏：左=必填缺失地图（标签上的 x/7 看不出缺的是哪几项，
+            这里点名并可点击定位），右=示例/带入操作 */}
+        {(() => {
+          const showMap = missingRequired.length > 0 && Boolean(activeOffer);
+          const showActions = Boolean(nothingFilled || (activeOffer && activeOffer.display_order > 1));
+          if (!showMap && !showActions) return null;
+          return (
+            <div className={`-mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 ${showMap ? "justify-between" : "justify-end"}`}>
+              {showMap && (
+                <div role="group" aria-label="必填缺失地图" className="flex flex-wrap items-center gap-2">
+                  <span>
+                    {activeOffer!.company || `Offer ${String.fromCharCode(64 + activeOffer!.display_order)}`} 还缺必填：
+                  </span>
+                  {missingRequired.map(({ fieldKey, label }) => (
+                    <button
+                      key={fieldKey}
+                      type="button"
+                      onClick={() => focusMissingField(fieldKey)}
+                      title="点击定位到该字段"
+                      className="min-h-8 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {showActions && (
+                <div className="flex flex-wrap items-center gap-x-4">
+                  {nothingFilled && (
+                    <button
+                      type="button"
+                      onClick={() => void viewExampleReport()}
+                      disabled={demoGenerating || submitBatch.isPending || stop.isPending}
+                      title="三份改编自公开校招信息的对比示例（公司名为虚构），覆盖报告、试算、反解等全部功能，随时可清空重来"
+                      className="-my-2 inline-flex min-h-11 items-center font-medium text-blue-700 underline-offset-4 hover:underline disabled:opacity-50"
+                    >
+                      {demoGenerating ? "正在生成示例…" : "先看一份示例报告"}
+                    </button>
+                  )}
+                  {activeOffer && activeOffer.display_order > 1 && (
+                    <button
+                      type="button"
+                      onClick={copyFromPreviousOffer}
+                      disabled={createOffer.isPending}
+                      title="把上一份 Offer 已填的内容带入本份的空白项，不覆盖已填内容"
+                      className="-my-2 inline-flex min-h-11 items-center font-medium text-blue-700 underline-offset-4 hover:underline disabled:opacity-50"
+                    >
+                      从上一份带入
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ── 选中的 Offer 面板（同一时刻只渲染一份，卡内分节折叠）── */}
         {activeOffer && (
@@ -703,6 +983,7 @@ function CompletePageInner() {
             expanded={expanded}
             onToggleSection={toggleSection}
             onDraftChange={changeDraft}
+            onNotice={showNotice}
             mergedDraftOf={mergedDraft}
             drafts={drafts}
           />
@@ -715,13 +996,19 @@ function CompletePageInner() {
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100"><Compass aria-hidden="true" className="h-5 w-5 text-blue-700" /></span>
               <span className="min-w-0 flex-1">
                 <span className="block text-base font-semibold text-ink">
-                  {preference ? "调整我的偏好" : "点击测试我更在意什么"}
+                  {preference ? "调整我的偏好" : previewSummary ? "你的偏好已算出，尚未保存" : "点击测试我更在意什么"}
                 </span>
-                {!preference && <span className="mt-1 block text-xs text-slate-500">默认：{weightSummary}</span>}
+                {!preference && (
+                  <span className="mt-1 block text-xs text-slate-500">
+                    {previewSummary ? `你的权重：${previewSummary}` : `默认：${weightSummary}`}
+                  </span>
+                )}
                 <span className="mt-1 block text-xs leading-relaxed text-neutral-500">
                   {preference
                     ? `${preference.source === "manual" ? "手动调整" : "问卷结果"} · ${weightSummary}`
-                    : "默认按考虑买房计算"}
+                    : previewSummary
+                      ? "展开确认并保存后，报告才会按这组权重计算"
+                      : "默认按考虑买房计算"}
                 </span>
               </span>
               <span className={`transition-transform ${prefExpanded ? "rotate-90" : ""}`}><ChevronRight /></span>
@@ -736,6 +1023,7 @@ function CompletePageInner() {
                 saved={Boolean(preference)}
                 saving={putPrefs.isPending}
                 onSaveQuestionnaire={saveQuestionnairePrefs}
+                onPreviewWeights={setPreviewWeights}
                 startImmediately
               />
             </div>
@@ -748,6 +1036,11 @@ function CompletePageInner() {
         <div>
           <p className="text-base font-semibold text-ink">准备好，把选择摆上桌</p>
           <p className="mt-1 text-sm text-slate-500">{offerList.length} 份 Offer · 生成前会保存当前填写内容</p>
+          {offersMissingRequired.length > 0 && (
+            <p className="mt-2 text-xs leading-5 text-amber-800">
+              还有必填未填齐，现在生成不含综合排名。
+            </p>
+          )}
         </div>
           <Button
             variant="accent"
@@ -759,6 +1052,7 @@ function CompletePageInner() {
             {!submitBatch.isPending && !stop.isPending && <ChevronRight />}
           </Button>
       </div>
+      <Toast message={notice?.text ?? null} />
     </div>
   );
 }

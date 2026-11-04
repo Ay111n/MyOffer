@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { create } from "zustand";
 
-import { clearDraftsForSession } from "@/lib/draft-storage";
+import { clearAllDrafts } from "@/lib/draft-storage";
 
 type FlowState = {
   sessionId: string | null;
@@ -56,16 +56,50 @@ function writePersistedSid(id: string | null): void {
   }
 }
 
-/** 清空本机保存的会话痕迹与草稿（会话失效回退 / 用户主动清除时调用）。 */
+/** sessionStorage 里按会话隔离的卫星缓存前缀：清除本机数据时一并清掉。 */
+const SATELLITE_PREFIXES = ["preference-questionnaire:", "myoffer-ai-report:"];
+/** localStorage 里按会话隔离的卫星缓存前缀：问卷草稿（2026-10-28 起从
+ *  sessionStorage 迁入，与 offer 草稿同 survive 标签关闭）。 */
+const LOCAL_SATELLITE_PREFIXES = ["preference-questionnaire:"];
+
+function removeStorageByPrefixes(storage: Storage, prefixes: string[]): void {
+  try {
+    const doomed: string[] = [];
+    for (let i = 0; i < storage.length; i += 1) {
+      const key = storage.key(i);
+      if (key && prefixes.some((prefix) => key.startsWith(prefix))) doomed.push(key);
+    }
+    for (const key of doomed) storage.removeItem(key);
+  } catch { /* 存储不可用时忽略 */ }
+}
+
+function removeSessionStorageByPrefixes(prefixes: string[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    removeStorageByPrefixes(window.sessionStorage, prefixes);
+  } catch { /* 存储不可用时忽略 */ }
+}
+
+function removeLocalStorageByPrefixes(prefixes: string[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    removeStorageByPrefixes(window.localStorage, prefixes);
+  } catch { /* 存储不可用时忽略 */ }
+}
+
+/** 清空本机保存的全部会话痕迹（用户主动「清除本机数据」时调用）：
+ *  跨标签会话记录 + 全部 sid 的未提交草稿 + 问卷/AI 解读的按会话缓存。
+ *  会话失效自动重建会留下旧 sid 的键，只按当前 sid 清是清不干净的。 */
 export function clearLocalWorkspace(): void {
   if (typeof window !== "undefined") {
     try {
       window.sessionStorage.removeItem(SID_STORAGE_KEY);
     } catch { /* 存储不可用时忽略 */ }
   }
-  const persisted = readPersistedSid();
+  removeSessionStorageByPrefixes(SATELLITE_PREFIXES);
+  removeLocalStorageByPrefixes(LOCAL_SATELLITE_PREFIXES);
   writePersistedSid(null);
-  clearDraftsForSession(persisted);
+  clearAllDrafts();
 }
 
 /**
@@ -76,7 +110,8 @@ export function clearLocalWorkspace(): void {
  * 落一份带时间戳的记录到 localStorage（24 小时内有效）：误关标签页/
  * 浏览器后重开仍能回到同一工作区，草稿同样只存本机。恢复的 sessionId
  * 若在后端已不存在（服务重启/会话被清理/TTL 过期），404 中间件
- * （lib/api/client.ts::discardLocalSession）会清空本地状态并回到首页。
+ * （lib/api/client.ts::discardLocalSession）只解除会话绑定并回到首页，
+ * 本机草稿原样保留——填写页的「恢复上次填写」横幅负责把它们找回。
  *
  * 初始值必须是 null（而不是创建时同步读 sessionStorage）：页面为静态导出，
  * 预渲染 HTML 按 null 生成，若客户端首帧就带着恢复的 sid 渲染会话视图，

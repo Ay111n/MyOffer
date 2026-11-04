@@ -15,6 +15,7 @@ import { api } from "@/lib/api/client";
 import { readApiError } from "@/lib/api/errors";
 import type { OfferReportView, ResultView, S } from "@/lib/api/types";
 import { offerColor } from "@/lib/constants";
+import { nameOf } from "@/lib/verdict";
 import { cn } from "@/lib/utils";
 
 const DIMENSION_LABELS: Record<string, string> = {
@@ -84,6 +85,18 @@ export function ScenarioPanel({
   // 奖金倍数依赖已填的年终奖事实；没填就禁用该杠杆并说明原因
   const bonusKnown = target != null
     && (target.input_values?.annual_bonus_value != null || target.input_values?.annual_bonus_months != null);
+  // 当前口径提示：倍数是相对当前的乘率（1 = 不变），按方式取对应字段展示
+  // 现值——曾硬填 1 又不说明口径，用户以为它就是 Offer 的真实倍数（2026-10-28 反馈）
+  const currentBonusHint = (() => {
+    const facts = target?.input_values ?? {};
+    if (facts.annual_bonus_method === "multiple" && typeof facts.annual_bonus_months === "number") {
+      return ` · 当前 ${facts.annual_bonus_months} 个月薪`;
+    }
+    if (typeof facts.annual_bonus_value === "number") {
+      return ` · 当前年终奖 ¥${Math.round(facts.annual_bonus_value).toLocaleString("zh-CN")}`;
+    }
+    return "";
+  })();
   // 反解只对「非第一名」有意义；并列第一也无需追平
   const leaderOf = useMemo(() => offers.find((o) => o.overall_rank === 1) ?? null, [offers]);
   const solveDisabled = target == null || target.overall_rank === 1;
@@ -177,7 +190,7 @@ export function ScenarioPanel({
               >
                 {String.fromCharCode(64 + offer.display_order)}
               </span>
-              {offer.company}
+              {nameOf(offer)}
             </button>
           ))}
         </div>
@@ -199,14 +212,14 @@ export function ScenarioPanel({
           </label>
           <label>
             <span className="mb-1 block text-xs font-medium text-slate-500">
-              年终奖倍数{bonusKnown ? "" : " · 未填年终奖，不可用"}
+              年终奖倍率{bonusKnown ? currentBonusHint : " · 未填年终奖，不可用"}
             </span>
             <input
               type="number" min={0} max={2} step={0.1}
               value={bonusFactor} onChange={(e) => setBonusFactor(e.target.value)}
-              placeholder="1"
+              placeholder="1 = 不变"
               disabled={running || !target || !bonusKnown}
-              aria-label="试算年终奖倍数"
+              aria-label="试算年终奖倍率"
               className="min-h-11 w-full rounded-lg border border-hairline bg-white px-3 text-base text-ink outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10 disabled:opacity-60"
             />
           </label>
@@ -242,7 +255,7 @@ export function ScenarioPanel({
         <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-hairline pt-4">
           <Target aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400" />
           <span className="text-sm text-slate-500">
-            {target ? `反解：${target.company} 的月薪谈到多少能追平 ${leaderOf?.company ?? "第一名"}？` : "反解追平线"}
+            {target ? `反解：${nameOf(target)} 的月薪谈到多少能追平 ${leaderOf ? nameOf(leaderOf) : "第一名"}？` : "反解追平线"}
           </span>
           <button
             type="button" onClick={() => void solve()}
@@ -253,7 +266,7 @@ export function ScenarioPanel({
             {solving ? "计算中…" : "算出追平线"}
           </button>
           {solveDisabled && target && (
-            <span className="text-xs text-slate-400">{target.company} 已并列第一或领先，无需追平。</span>
+            <span className="text-xs text-slate-400">{nameOf(target)} 已并列第一或领先，无需追平。</span>
           )}
           {solveError && <p role="alert" className="text-sm text-red-600">{solveError}</p>}
         </div>
@@ -261,9 +274,9 @@ export function ScenarioPanel({
           <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50/40 p-4" aria-live="polite">
             {solution.required_value != null ? (
               <p className="text-sm leading-6 text-slate-700">
-                {target.company} 的月薪谈到 <strong className="text-ink">{money(solution.required_value)}</strong>
+                {nameOf(target)} 的月薪谈到 <strong className="text-ink">{money(solution.required_value)}</strong>
                 （{solution.delta ? `+${money(solution.delta)}` : "持平"}，现在 {money(solution.current_value)}）
-                即可与 {leaderOf?.company ?? "当前第一名"} 以 {solution.leader_score.toFixed(1)} 分并列第一。
+                即可与 {leaderOf ? nameOf(leaderOf) : "当前第一名"} 以 {solution.leader_score.toFixed(1)} 分并列第一。
               </p>
             ) : (
               <p className="text-sm leading-6 text-slate-700">
@@ -290,7 +303,7 @@ export function ScenarioPanel({
                   <div key={offer.offer_id} className="min-w-36">
                     <p className="flex items-center gap-1.5 text-xs text-slate-500">
                       <span aria-hidden="true" style={{ backgroundColor: offerColor(offer.display_order) }} className="h-2.5 w-2.5 rounded-full" />
-                      {offer.company}
+                      {nameOf(offer)}
                       {nowFirst && <span className="font-semibold text-blue-700">调整后第一</span>}
                     </p>
                     <p className="metric mt-0.5 text-lg text-ink tabular-nums">
@@ -307,7 +320,7 @@ export function ScenarioPanel({
             </div>
             {target.dimension_scores && (
               <p className="mt-3 text-sm leading-6 text-slate-600">
-                {target.company} 的维度分变为：
+                {nameOf(target)} 的维度分变为：
                 {Object.entries(DIMENSION_LABELS).map(([key, label]) => {
                   const after = trial.offers?.find((o) => o.offer_id === target.offer_id)?.dimension_scores?.[key];
                   return ` ${label} ${after != null ? after.toFixed(1) : "—"}`;

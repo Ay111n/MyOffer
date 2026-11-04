@@ -224,6 +224,15 @@ const FIELD_STEP: Record<string, string> = {
   travel_days_per_month: "1",
 };
 
+/** 常见取值范围提示（展示口径，非硬校验）：应届生盲区字段给出典型区间与
+ *  填写口径，避免「80 还是 0.8」「含不含午休」这类猜测（2026-10-27 试用反馈）。 */
+const FIELD_HINT: Record<string, string> = {
+  probation_months: "通常 1–6 个月",
+  probation_pay_percent: "填 80 表示打 8 折，通常 80–100",
+  weekly_work_hours: "按典型一周估算，通常 40–50",
+  annual_raise_percent: "填 8 表示每年调薪 8%",
+};
+
 /** 数值输入上限：与 backend rules/fields.yaml 各字段声明的 max 对齐；
  *  未列出的字段后端同样无上限。超限提交会被后端 422（out_of_range）。
  *
@@ -366,7 +375,9 @@ function CityDropdown({
   const rootRef = useRef<HTMLDivElement>(null);
   const tiers = useCityTiers().data ?? {};
 
-  // 过滤 + 分组；高亮索引基于"占位项 + 过滤后全部选项"的扁平序列（组标题不占位）
+  // 过滤 + 分组；高亮索引基于全部选项的扁平序列（组标题不占位）。
+  // 「请选择城市」只作为触发器的空态文案，不再是列表里的可选项——
+  // 占位符渲染成带选中态的选项会诱导误点（2026-10-27 试用反馈）。
   const kw = query.trim();
   const filtered = kw ? options.filter((option) => option.label.includes(kw)) : options;
   const byGroup = new Map<string, { value: string; label: string }[]>();
@@ -377,8 +388,8 @@ function CityDropdown({
     else byGroup.set(group, [option]);
   }
   const groups = CITY_GROUP_ORDER.filter((g) => (byGroup.get(g)?.length ?? 0) > 0);
-  const flat = [{ value: "", label: "请选择城市" }, ...groups.flatMap((g) => byGroup.get(g) ?? [])];
-  const selectedIdx = Math.max(0, flat.findIndex((item) => item.value === value));
+  const flat = groups.flatMap((g) => byGroup.get(g) ?? []);
+  const selectedIdx = flat.findIndex((item) => item.value === value);
   const hl = Math.min(highlight, flat.length - 1);
 
   // 打开期间：点击外部 / Esc 关闭（监听挂在 document，弹层外的任何点击都能收起）
@@ -407,8 +418,8 @@ function CityDropdown({
   type Row =
     | { kind: "group"; label: string }
     | { kind: "option"; index: number; item: { value: string; label: string } };
-  const rows: Row[] = [{ kind: "option", index: 0, item: flat[0] }];
-  let optionIdx = 1;
+  const rows: Row[] = [];
+  let optionIdx = 0;
   for (const g of groups) {
     rows.push({ kind: "group", label: g });
     for (const item of byGroup.get(g) ?? []) {
@@ -421,7 +432,7 @@ function CityDropdown({
     setOpen(false);
     setQuery("");
     const chosen = flat[index];
-    if (chosen) onChange(chosen.value === "" ? undefined : chosen.value);
+    if (chosen) onChange(chosen.value);
   };
 
   const moveHighlight = (delta: number) => {
@@ -436,7 +447,7 @@ function CityDropdown({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => {
-          if (!open) setHighlight(selectedIdx);
+          if (!open) setHighlight(selectedIdx >= 0 ? selectedIdx : 0);
           else setQuery(""); // 触发按钮收起时同样清空过滤词
           setOpen((prev) => !prev);
         }}
@@ -457,7 +468,7 @@ function CityDropdown({
         }`}
       >
         <span className={`flex-1 text-left ${value ? "text-slate-800" : "text-slate-500"}`}>
-          {flat[selectedIdx]?.label}
+          {value ? flat[selectedIdx]?.label ?? value : "请选择城市"}
         </span>
         <ChevronDown
           aria-hidden="true"
@@ -465,7 +476,7 @@ function CityDropdown({
         />
       </button>
       {open && (
-        <div className="absolute right-0 z-30 mt-1.5 w-max min-w-full overflow-hidden rounded-xl border border-hairline bg-white shadow-float">
+        <div className="absolute right-0 z-30 mt-1.5 w-max min-w-[16rem] overflow-hidden rounded-xl border border-hairline bg-white shadow-float">
           <div className="border-b border-hairline p-1.5">
             <input
               autoFocus
@@ -504,13 +515,13 @@ function CityDropdown({
                 <li
                   key={`__group_${row.label}`}
                   role="presentation"
-                  className="px-3 pb-1 pt-2 text-left text-[11px] font-medium text-neutral-400"
+                  className="px-3 pb-1 pt-2 text-left text-xs font-semibold text-neutral-500"
                 >
                   {row.label}
                 </li>
               ) : (
                 <li
-                  key={row.item.value || "__placeholder__"}
+                  key={row.item.value}
                   role="option"
                   aria-selected={row.index === selectedIdx}
                   ref={(el) => {
@@ -523,9 +534,7 @@ function CityDropdown({
                       ? "bg-blue-50 font-semibold text-blue-600"
                       : row.index === hl
                         ? "bg-neutral-100"
-                        : row.item.value === ""
-                          ? "text-neutral-400"
-                          : "text-neutral-700"
+                        : "text-neutral-700"
                   }`}
                 >
                   {row.item.label}
@@ -546,6 +555,7 @@ function FieldControl({
   onChange,
   readOnly,
   showPending,
+  monthlyBase,
 }: {
   field: UiRenderField;
   value: FieldDraft | undefined;
@@ -553,6 +563,8 @@ function FieldControl({
   onChange: (value: unknown) => void;
   readOnly?: boolean;
   showPending: boolean;
+  /** 月薪现值（跨题取值）：年终奖「倍数」模式的换算提示用。 */
+  monthlyBase?: number | null;
 }) {
   const isKnown = value?.status === "known";
   const isNotApplicable = value?.status === "not_applicable";
@@ -677,49 +689,78 @@ function FieldControl({
   }
 
   const isTime = field.field_key === "work_start_time" || field.field_key === "work_end_time";
+  // 年终奖「倍数」模式的即时换算：填 3 倍立刻看到 ≈ 多少元/年，
+  // 不用等到生成报告（2026-10-27 试用反馈：倍数无换算反馈）
+  const bonusHint = field.field_key === "annual_bonus_value"
+    && draft.annual_bonus_method?.value === "multiple"
+    && typeof value?.value === "number"
+    && typeof monthlyBase === "number"
+    ? `≈ 月薪 × ${value.value} = ¥${Math.round(monthlyBase * value.value).toLocaleString("zh-CN")}/年`
+    : null;
+  // 大额整数给千分位等值提示。不做输入框内分组展示：聚焦→重渲染的间隙里
+  // 击键会追加到旧分组字符串后面（"15,000"→"15,00031000"，e2e 实测），
+  // 掩码输入的光标维护成本远超收益
+  const groupedHint = !isTime && field.value_type !== "text"
+    && typeof value?.value === "number" && Number.isInteger(value.value) && Math.abs(value.value) >= 10000
+    ? `= ${value.value.toLocaleString("zh-CN")}`
+    : null;
+  const hint = bonusHint ?? groupedHint ?? FIELD_HINT[field.field_key] ?? null;
   return (
-    <div className="number-control">
-      <input
-        aria-label={label}
-        type={isTime ? "time" : field.value_type === "text" ? "text" : "number"}
-        step={isTime ? undefined : FIELD_STEP[field.field_key] ?? "0.1"}
-        min={field.value_type === "number" || field.value_type === "money" || field.value_type === "percent" ? 0 : undefined}
-        max={fieldMax(field.field_key)}
-        placeholder={placeholder}
-        value={field.value_type === "text"
-          ? String(value?.value ?? "")
-          : fieldDisplayValue(field.field_key, value?.value)}
-        onChange={(event) => {
-          if (field.value_type === "text") onChange(event.target.value || undefined);
-          else onChange(event.target.value === ""
-            ? undefined
-            : fieldStoredValue(field.field_key, Number(event.target.value)));
-        }}
-        className={`min-w-0 border-0 bg-transparent py-2.5 text-left text-sm tabular-nums text-slate-900 outline-none placeholder:text-slate-400 focus-visible:outline-none ${
-          isTime ? "w-32" : field.value_type === "text" ? "w-40" : "w-28"
-        }`}
-      />
-      {unit && <span className="shrink-0 text-xs text-slate-500">{unit}</span>}
+    <div className="min-w-0">
+      <div className="number-control">
+        <input
+          aria-label={label}
+          type={isTime ? "time" : field.value_type === "text" ? "text" : "number"}
+          step={isTime ? undefined : FIELD_STEP[field.field_key] ?? "0.1"}
+          min={field.value_type === "number" || field.value_type === "money" || field.value_type === "percent" ? 0 : undefined}
+          max={fieldMax(field.field_key)}
+          placeholder={placeholder}
+          value={field.value_type === "text"
+            ? String(value?.value ?? "")
+            : fieldDisplayValue(field.field_key, value?.value)}
+          onChange={(event) => {
+            if (field.value_type === "text") onChange(event.target.value || undefined);
+            else onChange(event.target.value === ""
+              ? undefined
+              : fieldStoredValue(field.field_key, Number(event.target.value)));
+          }}
+          className={`min-w-0 border-0 bg-transparent py-2.5 text-left text-sm tabular-nums text-slate-900 outline-none placeholder:text-slate-400 focus-visible:outline-none ${
+            isTime ? "w-32" : field.value_type === "text" ? "w-40" : "w-28"
+          }`}
+        />
+        {unit && <span className="shrink-0 text-xs text-slate-500">{unit}</span>}
+      </div>
+      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
     </div>
   );
 }
 
-function OfferColumnBase({ qkey, oid, name, fields: fieldsIn, draft, onDraftChange, readOnly, showPending = false, showHeader = true }: {
+function OfferColumnBase({ qkey, oid, name, fields: fieldsIn, draft, onDraftChange, onNotice, readOnly, showPending = false, showHeader = true, monthlyBase = null }: {
   qkey: string; oid: string; name: string; fields?: RenderField[];
   draft: Record<string, FieldDraft>;
   onDraftChange: (qkey: string, oid: string, fieldKey: string, draft: FieldDraft | null) => void;
+  /** 非阻塞信息提示（2s toast）：跨题联动需要向用户交代时使用。 */
+  onNotice?: (text: string) => void;
   readOnly?: boolean;
   showPending?: boolean;
   showHeader?: boolean;
+  monthlyBase?: number | null;
 }) {
   const onChange = useCallback(
     (fieldKey: string, value: unknown) => {
+      // 年终奖「金额/倍数」切换：同一输入框在两种方式下单位不同（元 vs 月薪
+      // 倍数），已有数值作废并显式撤销服务端旧值，避免 2 万被按「2 万倍」
+      // 解读。清空必须可感知——曾静默丢失用户输入（2026-10-28 反馈）。
+      if (fieldKey === "annual_bonus_method" && draft.annual_bonus_value?.status === "known") {
+        onDraftChange(qkey, oid, "annual_bonus_value", { status: "pending" });
+        onNotice?.("已切换方式，原输入已清空");
+      }
       // 清空/取消选择（undefined）→ 待定：生成时提交为 unknown，撤销服务端旧值；
       // 曾写成 known+undefined——被进度计成已填、提交时被静默过滤，旧值撤销不掉
       onDraftChange(qkey, oid, fieldKey,
         value === undefined ? { status: "pending" } : { status: "known", value });
     },
-    [onDraftChange, qkey, oid],
+    [onDraftChange, onNotice, qkey, oid, draft],
   );
   // 默认值不再代填进草稿（v0.7.2）：effectiveDraft = 用户编辑 + 服务端已答
   const effectiveDraft = draft;
@@ -755,6 +796,7 @@ function OfferColumnBase({ qkey, oid, name, fields: fieldsIn, draft, onDraftChan
                       onChange={(value) => onChange(field.field_key, value)}
                       readOnly={readOnly}
                       showPending={showPending}
+                      monthlyBase={monthlyBase}
                     />
                   </div>
                 ))}
@@ -786,5 +828,7 @@ export const OfferColumn = memo(OfferColumnBase, (prev, next) =>
   && prev.showPending === next.showPending
   && prev.showHeader === next.showHeader
   && prev.onDraftChange === next.onDraftChange
+  && prev.onNotice === next.onNotice
+  && prev.monthlyBase === next.monthlyBase
   && draftsShallowEqual(prev.draft, next.draft),
 );

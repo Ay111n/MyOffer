@@ -63,10 +63,11 @@ def restore_report(body: "ReportRestoreRequest", response: Response, request: Re
     portable = body.inputs
     inp = validate_restore(DecisionInput(
         offers=[OfferInput(offer_id=offer.offer_id, display_order=offer.display_order,
-                           # 归档携带的身份名；旧版归档无此二键（空名）兜底为槽位默认
-                           company=offer.company.strip() or f"Offer {chr(65 + index)}",
+                           # 归档携带的身份名原样导入；空名保持空串，占位名由
+                           # 展示层回退（与新建会话的空名种子一致）
+                           company=offer.company.strip(),
                            position=offer.position.strip(), facts=offer.facts)
-                for index, offer in enumerate(sorted(portable.offers, key=lambda item: item.display_order))],
+                for offer in sorted(portable.offers, key=lambda item: item.display_order)],
         preferences=portable.preferences,
     ), rules)
     if user is None:

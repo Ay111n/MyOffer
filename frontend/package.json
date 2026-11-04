@@ -8,7 +8,7 @@
     "start": "next start",
     "gen:api": "openapi-typescript ../backend/openapi.json -o lib/api/schema.d.ts",
     "test": "vitest run",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "e2e:prod": "playwright test -c playwright.prod.config.ts"
   },

@@ -164,3 +164,131 @@ export function clearDraftsForSession(sessionId: string | null): void {
     // 存储不可用时无从清除，忽略
   }
 }
+
+/** 清空本机全部会话的草稿（「清除本机数据」时调用）：
+ *  会话失效重建会产生旧 sid 的孤儿键，只按当前 sid 清是清不干净的。 */
+export function clearAllDrafts(): void {
+  const store = readStore();
+  if (!store) return;
+  const prefix = `${PREFIX}:`;
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < store.length; i += 1) {
+      const key = store.key(i);
+      if (key && key.startsWith(prefix)) keys.push(key);
+    }
+    for (const key of keys) store.removeItem(key);
+  } catch {
+    // 存储不可用时忽略
+  }
+}
+
+/** 某会话草稿的最新保存时间（无内容返回 0），供孤儿列表按新旧排序。 */
+function latestDraftTimestamp(sessionId: string): number {
+  const store = readStore();
+  if (!store) return 0;
+  const prefix = `${PREFIX}:${sessionId}:`;
+  let latest = 0;
+  try {
+    for (let i = 0; i < store.length; i += 1) {
+      const key = store.key(i);
+      if (!key || !key.startsWith(prefix)) continue;
+      try {
+        const parsed = JSON.parse(store.getItem(key) ?? "") as WrappedDraft;
+        if (parsed && typeof parsed.t === "number" && parsed.t > latest) latest = parsed.t;
+      } catch {
+        // 单条损坏不阻断扫描
+      }
+    }
+  } catch {
+    // 存储不可用：按 0 处理
+  }
+  return latest;
+}
+
+/**
+ * 列出除 currentSid 外、localStorage 中仍含未提交内容的会话 id（新→旧）。
+ * 供「恢复上次填写」横幅使用：会话失效自动重建后，旧 sid 的草稿仍在
+ * 本机（24h TTL），在这里被重新发现。读取过程会顺手清掉过期/损坏条目。
+ */
+export function listOrphanDraftSessions(currentSid: string | null): string[] {
+  const store = readStore();
+  if (!store) return [];
+  const prefix = `${PREFIX}:`;
+  const sids = new Set<string>();
+  try {
+    for (let i = 0; i < store.length; i += 1) {
+      const key = store.key(i);
+      if (!key || !key.startsWith(prefix)) continue;
+      const rest = key.slice(prefix.length);
+      const sep = rest.indexOf(":");
+      if (sep <= 0) continue;
+      const sid = rest.slice(0, sep);
+      if (sid !== currentSid) sids.add(sid);
+    }
+  } catch {
+    return [];
+  }
+  const orphans: { sid: string; latest: number }[] = [];
+  for (const sid of sids) {
+    if (!hasUnsubmittedDrafts(loadDraftsForSession<Record<string, unknown>>(sid))) continue;
+    orphans.push({ sid, latest: latestDraftTimestamp(sid) });
+  }
+  return orphans.sort((a, b) => b.latest - a.latest).map((item) => item.sid);
+}
+
+/**
+ * 把 fromSid 的全部草稿迁移到 toSid：offer id 经 remap 重写后落入新会话
+ * 键下并删除旧键；新会话已有的 offer 条目保持不动（不覆盖）。任一条目
+ * 写入失败即中止并保留旧键，下次仍可整体重试。
+ */
+export function migrateDraftsBetweenSessions(
+  fromSid: string,
+  toSid: string,
+  remapOfferId: (oid: string) => string | null,
+): void {
+  if (!fromSid || !toSid || fromSid === toSid) return;
+  const store = readStore();
+  if (!store) return;
+  const prefix = `${PREFIX}:${fromSid}:`;
+  const keys: string[] = [];
+  try {
+    for (let i = 0; i < store.length; i += 1) {
+      const key = store.key(i);
+      if (key && key.startsWith(prefix)) keys.push(key);
+    }
+    for (const key of keys) {
+      const qkey = key.slice(prefix.length);
+      let wrapped: WrappedDraft | null = null;
+      try {
+        wrapped = JSON.parse(store.getItem(key) ?? "") as WrappedDraft;
+      } catch {
+        store.removeItem(key); // 损坏条目直接淘汰
+        continue;
+      }
+      if (!wrapped || typeof wrapped !== "object" || wrapped.v == null || typeof wrapped.v !== "object") {
+        store.removeItem(key);
+        continue;
+      }
+      const existing = (readEntry(draftKey(toSid, qkey)) ?? null) as Record<string, unknown> | null;
+      const merged: Record<string, unknown> = { ...(existing ?? {}) };
+      for (const [oid, fields] of Object.entries(wrapped.v as Record<string, unknown>)) {
+        const mapped = remapOfferId(oid);
+        if (!mapped || fields == null || typeof fields !== "object" || Object.keys(fields as object).length === 0) continue;
+        if (!(mapped in merged)) merged[mapped] = fields;
+      }
+      if (Object.keys(merged).length === 0) {
+        store.removeItem(key);
+        continue;
+      }
+      try {
+        store.setItem(draftKey(toSid, qkey), JSON.stringify({ t: Date.now(), v: merged } as WrappedDraft));
+        store.removeItem(key);
+      } catch {
+        return; // 写入失败（配额满等）：保留旧键，迁移中止
+      }
+    }
+  } catch {
+    // 存储不可用：无从迁移，保留原样
+  }
+}

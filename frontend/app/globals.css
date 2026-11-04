@@ -136,8 +136,18 @@
   100% { background-color: transparent; }
 }
 
+/* 非阻塞提示：浮入 → 停留约 2s → 淡出（总时长与 Toast 组件的清除定时器一致） */
+.toast-fade { animation: toast-life 2.4s var(--ease-apple) both; }
+@keyframes toast-life {
+  0% { opacity: 0; transform: translateY(8px); }
+  10%, 82% { opacity: 1; transform: none; }
+  100% { opacity: 0; }
+}
+
 * { box-sizing: border-box; }
-html { min-width: 320px; background: var(--color-paper); scroll-behavior: smooth; }
+/* 不设全局 scroll-behavior: smooth：连续滚动/锚点跳转的动画迟滞让落点
+   不可预期（2026-10-27 试用反馈）；深链定位已显式用 behavior:"smooth" */
+html { min-width: 320px; background: var(--color-paper); }
 body { min-height: 100vh; margin: 0; background: var(--color-paper); line-height: 1.7; }
 
 button:not(:disabled), summary, [role="option"] { cursor: pointer; }
@@ -216,6 +226,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
     transition-duration: 0.01ms !important;
   }
   html { scroll-behavior: auto; }
+  /* toast 的关键帧终态是 opacity:0（淡出），fill:both 会把 0.01ms 播完的
+     动画停在隐形——减少动画时改为无动画直显，靠 2.4s 定时器卸载 */
+  .toast-fade { animation: none; }
 }
 
 /* 报告打印：展开内容由打印入口控制，隐藏交互并保留来源与估算口径。 */

@@ -81,6 +81,19 @@ def assemble_decision_input(db: Session, session: DecisionSession, rules: RuleSe
         )
         for o in offers_rows
     ]
+    # 零 known 事实 Offer（已添加未填写，或全为待定/不适用）不进评分池：
+    # 留在池里会关闭全员可比的可选类目门控、并让综合分判定（complete）
+    # 永远不满足——「加一份空的还没填」就会改变其他 Offer 的得分。排除
+    # 口径与 report_v5._fact 一致（只认 status=known 且值非空），排除项仍
+    # 随快照携带供报告注明。全部空白时不排除：基线报告（空卡 + 缺口提示）
+    # 是既有行为，此时没有需要保护的已填 Offer。
+    def _has_known_fact(offer: OfferInput) -> bool:
+        return any(f.status == "known" and f.value is not None for f in offer.facts.values())
+
+    filled = [offer for offer in offer_inputs if _has_known_fact(offer)]
+    excluded = [offer for offer in offer_inputs if not _has_known_fact(offer)]
+    if not filled:
+        filled, excluded = offer_inputs, []
 
     pref_row = db.scalar(select(UserPreference).where(UserPreference.session_id == session.id))
     preferences = (
@@ -101,8 +114,9 @@ def assemble_decision_input(db: Session, session: DecisionSession, rules: RuleSe
     )
 
     return DecisionInput(
-        offers=offer_inputs,
+        offers=filled,
         preferences=preferences,
+        excluded_offers=excluded,
     )
 
 

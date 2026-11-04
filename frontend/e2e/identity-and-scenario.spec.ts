@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { fillExampleFactsViaApi } from "./helpers";
+
 /**
  * 第二轮功能的 E2E 固化：Offer 命名全链路 + 免写入试算 + 反解追平线。
  * 此前仅做过手工浏览器验证，本文件将其固化为回归锁。
@@ -12,13 +14,17 @@ test("改名贯穿填写页与报告页", async ({ page }) => {
   // 命名行：公司名 + 岗位，失焦保存后标签即时同步
   await page.getByRole("textbox", { name: "Offer A 的公司名称" }).fill("字节跳动");
   await page.getByRole("textbox", { name: "Offer A 的岗位" }).fill("后端开发");
-  await page.getByRole("button", { name: "填入示例数据" }).click(); // 点别处触发失焦保存
+  await page.getByRole("button", { name: "经济回报", exact: true }).click(); // 点别处触发失焦保存
+  // 标签先出现公司名 = 失焦保存的 PATCH 已落库，再走 API 造数 + 重载
+  await expect(page.getByRole("button", { name: /字节跳动/ })).toBeVisible({ timeout: 10_000 });
+  await fillExampleFactsViaApi(page);
   await expect(page.getByRole("button", { name: /字节跳动.*7\/7/ })).toBeVisible({ timeout: 10_000 });
 
   await page.getByRole("button", { name: "生成对比报告" }).click();
   await page.waitForURL(/\/results/);
-  // 报告页透传身份名（记分区与结论区都使用）
+  // 报告页透传身份名（得分区、结论区都使用，不再只显示 OFFER A 代称）
   await expect(page.getByText("字节跳动").first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("region", { name: "Offer 对比" }).getByText("字节跳动")).toBeVisible({ timeout: 10_000 });
 });
 
 test("试算与反解追平线", async ({ page }) => {

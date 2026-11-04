@@ -45,10 +45,17 @@ PY
 (cd "$STAGE/source/backend" && "$APP/backend/.venv/bin/python" -c \
  'from app.config import get_settings; from app.main import app; s=get_settings(); assert s.env == "production"; assert s.max_sessions == 200; print("staged backend configuration valid")')
 NEED_AI_INSTALL=0
+AI_DEPENDENCIES_EXISTED=0
+AI_DEPENDENCIES_REPLACED=0
 if ! cmp -s "$APP/backend/ai-runtime/package-lock.json" "$STAGE/source/backend/ai-runtime/package-lock.json" \
     || [[ ! -d "$APP/backend/ai-runtime/node_modules/@earendil-works/pi-ai" ]]; then
   NEED_AI_INSTALL=1
   (cd "$STAGE/source/backend/ai-runtime" && npm ci --omit=dev --no-audit --no-fund)
+  # 主备份排除了 node_modules；更新依赖前单独保存旧依赖，回滚不依赖网络。
+  if [[ -d "$APP/backend/ai-runtime/node_modules" ]]; then
+    tar -czf "$BACKUP/ai-node_modules.tar.gz" -C "$APP/backend/ai-runtime" node_modules
+    AI_DEPENDENCIES_EXISTED=1
+  fi
 fi
 
 # APP 固定为既有部署目录；排除运行环境、秘密与静态目录，只同步源码树。
@@ -63,11 +70,21 @@ rollback() {
   systemctl stop myoffer-backend || true
   mkdir -p "$STAGE/rollback"
   tar -xzf "$BACKUP/tree.tar.gz" -C "$STAGE/rollback"
-  rsync -a --delete "${SYNC_EXCLUDES[@]}" --exclude='.git/' "$STAGE/rollback/" "$APP/"
+  rsync -a --checksum --delete "${SYNC_EXCLUDES[@]}" --exclude='.git/' "$STAGE/rollback/" "$APP/"
+  if [[ "$AI_DEPENDENCIES_REPLACED" == 1 ]]; then
+    if [[ "$AI_DEPENDENCIES_EXISTED" == 1 ]]; then
+      mkdir -p "$STAGE/rollback-ai"
+      tar -xzf "$BACKUP/ai-node_modules.tar.gz" -C "$STAGE/rollback-ai"
+      rsync -a --checksum --delete "$STAGE/rollback-ai/node_modules/" "$APP/backend/ai-runtime/node_modules/"
+    else
+      # 首次安装失败时恢复到原先没有运行依赖的状态。
+      rm -rf -- "$APP/backend/ai-runtime/node_modules"
+    fi
+  fi
   cp "$STAGE/rollback/.env" "$APP/.env"
-  rsync -a --delete "$STAGE/rollback/out/" "$APP/out/"
+  rsync -a --checksum --delete "$STAGE/rollback/out/" "$APP/out/"
   if [[ -d "$BACKUP/git" ]]; then
-    rsync -a --delete "$BACKUP/git/" "$APP/.git/"
+    rsync -a --checksum --delete "$BACKUP/git/" "$APP/.git/"
   else
     rm -rf -- "$APP/.git"
   fi
@@ -81,12 +98,15 @@ rollback() {
 }
 trap rollback ERR
 systemctl stop myoffer-backend
-rsync -a --delete "${SYNC_EXCLUDES[@]}" "$STAGE/source/" "$APP/"
+# 同大小、同修改时间也可能内容不同（尤其 Git refs），按内容同步才能核对发布提交。
+rsync -a --checksum --delete "${SYNC_EXCLUDES[@]}" "$STAGE/source/" "$APP/"
 install -m 600 "$STAGE/source/.env" "$APP/.env"
 if [[ "$NEED_AI_INSTALL" == 1 ]]; then
-  rsync -a --delete "$STAGE/source/backend/ai-runtime/node_modules/" "$APP/backend/ai-runtime/node_modules/"
+  # 先标记再复制：rsync 中途失败也必须恢复旧依赖。
+  AI_DEPENDENCIES_REPLACED=1
+  rsync -a --checksum --delete "$STAGE/source/backend/ai-runtime/node_modules/" "$APP/backend/ai-runtime/node_modules/"
 fi
-rsync -a --delete "$STAGE/out/" "$APP/out/"
+rsync -a --checksum --delete "$STAGE/out/" "$APP/out/"
 printf '/out/\n/out.old-*/\n' >> "$APP/.git/info/exclude"
 chown -R myoffer:myoffer "$APP"
 chmod 755 "$APP" "$APP/out"

@@ -1,5 +1,5 @@
 meta:
-  version: "0.7.2"
+  version: "0.7.3"
   status: >-
     reference data（城市 universe 唯一事实源；费率/房价/生活成本为参考值）。
     v0.6（2026-10）：universe 由 32 城扩至 121 城——一线+新一线+二线+三线
@@ -25,10 +25,20 @@ meta:
     维持旧值待贝壳成交口径专项复核。来源见 CITY_DATA_SOURCES.md。
 
     v0.7.2（2026-10-25 首批数据复核）：按 tools/city-data/update-2026-10.md 更新广东/河南省级社保基数（5521/27603、3912/19560，2026-07 执行口径）与深圳养老省统一对齐，25 城公积金更新至 2026 年度官方值；南通（2026 年度未公布，且存量上限疑似偏低）、衡阳（未查到新通知）沿用旧值继续计入过期警告，待人工向两市公积金中心核实。逐城来源 URL 与旧→新对照见 update-2026-10.md 与 expansion/results_C_*.yaml。
+    v0.7.3（2026-11-05 官方原文复核）：南通公积金改为市区下限2660、上限34000，
+    分别依据2026-01起最低工资与通金管〔2025〕50号（2025-07起执行）；
+    南通单位医保/生育按8%+1%拆分，合计9%。江苏13城社保基数统一更新为
+    5025/25127（苏人社发〔2026〕30号，2026-01至12月适用）。
+    衡阳公积金1700/21142仅核实到旧通知，上限自2024-01执行、下限自2025-01执行；
+    as_of按最旧关键口径更正为2024-01，继续提示复核。核查日不替代数据适用日期，
+    不宣称已收录两城2026年度公积金新通知。原文、发布日期、执行时间和差异见
+    ../../../../tools/city-data/update-2026-11-05.md。
+
 # 当前版本支持的城市 universe：Offer 城市、must_city/excluded_city 参数、
 # 前端城市选项（经 GET /meta 下发）的唯一事实源，前后端禁止另写一份列表。
 # 覆盖：一线+新一线+二线+三线全部 119 城（第一财经 2025 榜单）+ 省会兜底
 # 西宁（四线）/拉萨（五线），共 121 城。
+
 supported_cities: [北京, 上海, 天津, 重庆, 广州, 深圳, 成都, 杭州, 南京, 武汉, 西安, 长沙, 郑州, 合肥, 济南, 福州, 南昌, 石家庄, 太原, 呼和浩特, 沈阳, 长春, 哈尔滨, 南宁, 海口, 贵阳, 昆明, 拉萨, 兰州, 西宁, 银川, 乌鲁木齐, 苏州, 青岛, 东莞, 宁波, 佛山, 无锡, 厦门, 温州, 大连, 金华, 泉州, 常州, 南通, 嘉兴, 徐州, 惠州, 烟台, 临沂, 保定, 台州, 绍兴, 珠海, 洛阳, 潍坊, 中山, 盐城, 扬州, 济宁, 湖州, 赣州, 邯郸, 南阳, 唐山, 芜湖, 阜阳, 廊坊, 汕头, 泰州, 镇江, 江门, 菏泽, 连云港, 沧州, 淄博, 新乡, 周口, 襄阳, 淮安, 商丘, 桂林, 咸阳, 上饶, 宿迁, 漳州, 遵义, 滁州, 绵阳, 宜昌, 威海, 湛江, 九江, 邢台, 揭阳, 三亚, 衡阳, 信阳, 泰安, 荆州, 肇庆, 蚌埠, 安阳, 安庆, 德州, 株洲, 莆田, 聊城, 驻马店, 岳阳, 亳州, 柳州, 宜春, 宿州, 黄冈, 六安, 常德, 宁德, 茂名, 马鞍山, 衢州]
 
 # 每个城市的决策引擎配置条目（v0.7 报告引擎）。
@@ -148,11 +158,11 @@ cities:
   南京:
     tier_score: 90
     tier: "新一线"
-    as_of: "2026-09"
+    as_of: "2026-01"
     social_insurance:
       personal:  {medical: 0.02, pension: 0.08, unemployment: 0.005}
       employer:  {medical: 0.065, pension: 0.16, unemployment: 0.005, maternity: 0.005, injury: 0.004}
-    base_bounds: {min: 4952, max: 24762}
+    base_bounds: {min: 5025, max: 25127}
     hf_bounds:   {min: 2660, max: 41400}
     housing:     {price_per_sqm: 20700, typical_area_sqm: 80, down_payment_ratio: 0.15, loan_annual_rate: 0.03, loan_years: 30}
     living:      {baseline_cost_month: 3550}
@@ -436,11 +446,11 @@ cities:
   苏州:
     tier_score: 90
     tier: "新一线"
-    as_of: "2026-07"
+    as_of: "2026-01"
     social_insurance:
       personal:  {medical: 0.02, pension: 0.08, unemployment: 0.005}
       employer:  {medical: 0.065, pension: 0.16, unemployment: 0.005, maternity: 0.005, injury: 0.004}
-    base_bounds: {min: 4952, max: 24762}
+    base_bounds: {min: 5025, max: 25127}
     hf_bounds:   {min: 4952, max: 40600}
     housing:     {price_per_sqm: 22250, typical_area_sqm: 80, down_payment_ratio: 0.15, loan_annual_rate: 0.03, loan_years: 30}
     living:      {baseline_cost_month: 3350}
@@ -501,11 +511,11 @@ cities:
   无锡:
     tier_score: 82
     tier: "二线"
-    as_of: "2026-07"
+    as_of: "2026-01"
     social_insurance:
       personal:  {medical: 0.02, pension: 0.08, unemployment: 0.005}
       employer:  {medical: 0.065, pension: 0.16, unemployment: 0.005, maternity: 0.005, injury: 0.004}
-    base_bounds: {min: 4952, max: 24762}
+    base_bounds: {min: 5025, max: 25127}
     hf_bounds:   {min: 2660, max: 36800}
     housing:     {price_per_sqm: 9420, typical_area_sqm: 80, down_payment_ratio: 0.15, loan_annual_rate: 0.03, loan_years: 30}
     living:      {baseline_cost_month: 2800}
@@ -579,11 +589,11 @@ cities:
   常州:
     tier_score: 80
     tier: "二线"
-    as_of: "2026-07"
+    as_of: "2026-01"
     social_insurance:
       personal:  {medical: 0.02, pension: 0.08, unemployment: 0.005}
       employer:  {medical: 0.065, pension: 0.16, unemployment: 0.005, maternity: 0.005, injury: 0.004}
-    base_bounds: {min: 4952, max: 24762}
+    base_bounds: {min: 5025, max: 25127}
     hf_bounds:   {min: 2660, max: 34080}
     housing:     {price_per_sqm: 8730, typical_area_sqm: 80, down_payment_ratio: 0.15, loan_annual_rate: 0.03, loan_years: 30}
     living:      {baseline_cost_month: 2700}
@@ -595,13 +605,13 @@ cities:
     as_of: "2025-07"
     social_insurance:
       personal:  {medical: 0.02, pension: 0.08, unemployment: 0.005}
-      employer:  {medical: 0.065, pension: 0.16, unemployment: 0.005, maternity: 0.005, injury: 0.004}
-    base_bounds: {min: 4952, max: 24762}
-    hf_bounds:   {min: 2490, max: 29400}
+      employer:  {medical: 0.08, pension: 0.16, unemployment: 0.005, maternity: 0.01, injury: 0.004}
+    base_bounds: {min: 5025, max: 25127}
+    hf_bounds:   {min: 2660, max: 34000}
     housing:     {price_per_sqm: 8700, typical_area_sqm: 80, down_payment_ratio: 0.15, loan_annual_rate: 0.03, loan_years: 30}
     living:      {baseline_cost_month: 2400}
     rent_deduction_monthly: 1100
-      # 2025榜单第36位·二线｜公积金沿用2025年度，上限按社平工资推算（来源与推断标注见 ../../../../tools/city-data/expansion/）
+      # 2026-11-05复核：公积金上限2025-07起34000，下限2026-01起按市区最低工资2660；医保8%+生育1%。详见update-2026-11-05.md；as_of保留2025-07，未确认2026年度公积金新通知。
   嘉兴:
     tier_score: 80
     tier: "二线"
@@ -618,11 +628,11 @@ cities:
   徐州:
     tier_score: 80
     tier: "二线"
-    as_of: "2026-07"
+    as_of: "2026-01"
     social_insurance:
       personal:  {medical: 0.02, pension: 0.08, unemployment: 0.005}
       employer:  {medical: 0.065, pension: 0.16, unemployment: 0.005, maternity: 0.005, injury: 0.004}
-    base_bounds: {min: 4952, max: 24762}
+    base_bounds: {min: 5025, max: 25127}
     hf_bounds:   {min: 2490, max: 32917}
     housing:     {price_per_sqm: 7500, typical_area_sqm: 80, down_payment_ratio: 0.15, loan_annual_rate: 0.03, loan_years: 30}
     living:      {baseline_cost_month: 2300}
@@ -761,11 +771,11 @@ cities:
   盐城:
     tier_score: 70
     tier: "三线"
-    as_of: "2026-07"
+    as_of: "2026-01"
     social_insurance:
       personal:  {medical: 0.02, pension: 0.08, unemployment: 0.005}
       employer:  {medical: 0.065, pension: 0.16, unemployment: 0.005, maternity: 0.005, injury: 0.004}
-    base_bounds: {min: 4952, max: 24762}
+    base_bounds: {min: 5025, max: 25127}
     hf_bounds:   {min: 2490, max: 31314}
     housing:     {price_per_sqm: 6390, typical_area_sqm: 80, down_payment_ratio: 0.15, loan_annual_rate: 0.03, loan_years: 30}
     living:      {baseline_cost_month: 1900}
@@ -774,11 +784,11 @@ cities:
   扬州:
     tier_score: 70
     tier: "三线"
-    as_of: "2026-07"
+    as_of: "2026-01"
     social_insurance:
       personal:  {medical: 0.02, pension: 0.08, unemployment: 0.005}
       employer:  {medical: 0.065, pension: 0.16, unemployment: 0.005, maternity: 0.005, injury: 0.004}
-    base_bounds: {min: 4952, max: 24762}
+    base_bounds: {min: 5025, max: 25127}
     hf_bounds:   {min: 2490, max: 31618}
     housing:     {price_per_sqm: 8600, typical_area_sqm: 80, down_payment_ratio: 0.15, loan_annual_rate: 0.03, loan_years: 30}
     living:      {baseline_cost_month: 2100}
@@ -921,7 +931,7 @@ cities:
     social_insurance:
       personal:  {medical: 0.02, pension: 0.08, unemployment: 0.005}
       employer:  {medical: 0.065, pension: 0.16, unemployment: 0.005, maternity: 0.005, injury: 0.004}
-    base_bounds: {min: 4952, max: 24762}
+    base_bounds: {min: 5025, max: 25127}
     hf_bounds:   {min: 2660, max: 30258}
     housing:     {price_per_sqm: 8700, typical_area_sqm: 80, down_payment_ratio: 0.15, loan_annual_rate: 0.03, loan_years: 30}
     living:      {baseline_cost_month: 2000}
@@ -930,11 +940,11 @@ cities:
   镇江:
     tier_score: 70
     tier: "三线"
-    as_of: "2026-07"
+    as_of: "2026-01"
     social_insurance:
       personal:  {medical: 0.02, pension: 0.08, unemployment: 0.005}
       employer:  {medical: 0.065, pension: 0.16, unemployment: 0.005, maternity: 0.005, injury: 0.004}
-    base_bounds: {min: 4952, max: 24762}
+    base_bounds: {min: 5025, max: 25127}
     hf_bounds:   {min: 2660, max: 32400}
     housing:     {price_per_sqm: 6740, typical_area_sqm: 80, down_payment_ratio: 0.15, loan_annual_rate: 0.03, loan_years: 30}
     living:      {baseline_cost_month: 2000}
@@ -969,11 +979,11 @@ cities:
   连云港:
     tier_score: 70
     tier: "三线"
-    as_of: "2026-07"
+    as_of: "2026-01"
     social_insurance:
       personal:  {medical: 0.02, pension: 0.08, unemployment: 0.005}
       employer:  {medical: 0.065, pension: 0.16, unemployment: 0.005, maternity: 0.005, injury: 0.004}
-    base_bounds: {min: 4952, max: 24762}
+    base_bounds: {min: 5025, max: 25127}
     hf_bounds:   {min: 2260, max: 31545}
     housing:     {price_per_sqm: 7170, typical_area_sqm: 80, down_payment_ratio: 0.15, loan_annual_rate: 0.03, loan_years: 30}
     living:      {baseline_cost_month: 1900}
@@ -1047,11 +1057,11 @@ cities:
   淮安:
     tier_score: 70
     tier: "三线"
-    as_of: "2026-06"
+    as_of: "2026-01"
     social_insurance:
       personal:  {medical: 0.02, pension: 0.08, unemployment: 0.005}
       employer:  {medical: 0.065, pension: 0.16, unemployment: 0.005, maternity: 0.005, injury: 0.004}
-    base_bounds: {min: 4952, max: 24762}
+    base_bounds: {min: 5025, max: 25127}
     hf_bounds:   {min: 2490, max: 28800}
     housing:     {price_per_sqm: 5500, typical_area_sqm: 80, down_payment_ratio: 0.15, loan_annual_rate: 0.03, loan_years: 30}
     living:      {baseline_cost_month: 1800}
@@ -1112,11 +1122,11 @@ cities:
   宿迁:
     tier_score: 70
     tier: "三线"
-    as_of: "2026-07"
+    as_of: "2026-01"
     social_insurance:
       personal:  {medical: 0.02, pension: 0.08, unemployment: 0.005}
       employer:  {medical: 0.065, pension: 0.16, unemployment: 0.005, maternity: 0.005, injury: 0.004}
-    base_bounds: {min: 4952, max: 24762}
+    base_bounds: {min: 5025, max: 25127}
     hf_bounds:   {min: 2260, max: 27500}
     housing:     {price_per_sqm: 5180, typical_area_sqm: 80, down_payment_ratio: 0.15, loan_annual_rate: 0.03, loan_years: 30}
     living:      {baseline_cost_month: 1700}
@@ -1268,7 +1278,7 @@ cities:
   衡阳:
     tier_score: 70
     tier: "三线"
-    as_of: "2025-01"
+    as_of: "2024-01"
     social_insurance:
       personal:  {medical: 0.02, pension: 0.08, unemployment: 0.003}
       employer:  {medical: 0.08, pension: 0.16, unemployment: 0.007, maternity: 0.007, injury: 0.003}
@@ -1277,7 +1287,7 @@ cities:
     housing:     {price_per_sqm: 3141, typical_area_sqm: 80, down_payment_ratio: 0.15, loan_annual_rate: 0.03, loan_years: 30}
     living:      {baseline_cost_month: 2050}
     rent_deduction_monthly: 1100
-      # 2025榜单第95位·三线｜公积金沿用2025-01起执行的官方值（衡金管委字〔2024〕5号）（来源与推断标注见 ../../../../tools/city-data/expansion/）
+      # 2026-11-05复核：衡金管委字〔2024〕5号，上限21142自2024-01执行，下限1700自2025-01执行；未确认新缴存通知，保留旧值及警告，详见update-2026-11-05.md。
   信阳:
     tier_score: 70
     tier: "三线"

@@ -83,7 +83,7 @@ function ClearLocalData() {
       type="button"
       onClick={clear}
       title="删除保存在本机的未提交草稿与会话痕迹"
-      className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-ink"
+      className="inline-flex min-h-11 items-center gap-1 whitespace-nowrap font-medium text-slate-600 transition-colors hover:text-ink"
     >
       <Eraser aria-hidden="true" className="h-3.5 w-3.5" />
       清除本机数据
@@ -102,8 +102,8 @@ export function FlowShell({ children }: { children: React.ReactNode }) {
           <Link href="/" aria-label="MyOffer · 返回首页" className="flex shrink-0 items-center">
             <BrandLogo />
           </Link>
-          <div className="flex items-center gap-4 sm:gap-6">
-            <Link href="/settings/models" className="text-sm font-medium text-slate-600 hover:text-ink">模型配置</Link>
+          <div className="flex items-center gap-2.5 text-xs sm:gap-6 sm:text-sm">
+            <Link href="/settings/models" className="inline-flex min-h-11 items-center whitespace-nowrap font-medium text-slate-600 hover:text-ink">模型配置</Link>
             <ReportRestore />
             <ReportExport sessionId={sessionId ?? ""} />
             <ClearLocalData />

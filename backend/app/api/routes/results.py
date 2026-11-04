@@ -108,11 +108,14 @@ def result_by_seq(
 def export_report(session=Depends(require_owned_session), db: Session = Depends(get_db)):
     from app.services.recompute import assemble_decision_input
     inp = assemble_decision_input(db, session, get_rules())
+    # 归档携带全部 Offer（含被评分排除的零事实 Offer）：导入要还原完整工作区，
+    # 未填的那份不能在导出/导入链路上凭空消失
+    all_offers = sorted([*inp.offers, *inp.excluded_offers], key=lambda offer: offer.display_order)
     return ReportArchive(inputs={"offers": [{"offer_id": offer.offer_id,
                                               "display_order": offer.display_order,
                                               "company": offer.company,
                                               "position": offer.position,
-                                              "facts": offer.facts} for offer in inp.offers],
+                                              "facts": offer.facts} for offer in all_offers],
                                  "preferences": inp.preferences})
 
 

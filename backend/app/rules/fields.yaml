@@ -662,15 +662,17 @@ housing_fund_base_type:
 special_additional_deductions:
   value_type: multi_enum
   evidence_category: personal_context
+  # 个人所得税专项附加扣除（应届生盲区）：选项用全称+定额，不用「子女2k」
+  # 这类缩写（2026-10-27 试用反馈：无法理解、猜不到「养老3k」是赡养老人）
   options:
-    - {value: children_education, label: 子女2k}
-    - {value: continuing_education, label: 继续教育}
-    - {value: mortgage_interest, label: 房贷1k}
+    - {value: children_education, label: 子女教育（每月 2000 元）}
+    - {value: continuing_education, label: 继续教育（每月 400 元）}
+    - {value: mortgage_interest, label: 房贷利息（每月 1000 元）}
     # 住房租金分三档（1500/1100/800，按城市见 city_index rent_deduction_monthly），
-    # label 不标金额以免误导非 1500 档城市
-    - {value: rent, label: 住房租金}
-    - {value: elderly_support, label: 养老3k}
-    - {value: infant_care, label: 婴幼儿2k}
+    # label 标区间不标单一金额，以免误导非 1500 档城市
+    - {value: rent, label: 住房租金（按城市每月 800–1500 元）}
+    - {value: elderly_support, label: 赡养老人（每月 3000 元）}
+    - {value: infant_care, label: 3 岁以下婴幼儿照护（每月 2000 元）}
   default_value: []
   required_level: optional
   collection: initial_questions

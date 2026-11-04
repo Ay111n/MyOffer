@@ -90,12 +90,15 @@ def create_session(
     session = DecisionSession(user_id=user.id, title=title, phase="completion")
     db.add(session)
     db.flush()  # 取回 session.id 供默认候选项外键使用
-    for slot, letter in enumerate("AB", start=1):
+    for slot, _letter in enumerate("AB", start=1):
         db.add(
             Offer(
                 session_id=session.id,
                 display_order=slot,
-                company=f"Offer {letter}",
+                # 公司名留空：README 承诺「无需填写公司或岗位名称」，预填真值
+                # 「Offer A」会被误当作已填写内容带进报告与导出（2026-10-27
+                # 试用反馈）；展示层（前端 nameOf/标签）统一回退为 Offer A/B。
+                company="",
                 position="",
             )
         )

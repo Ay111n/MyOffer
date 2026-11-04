@@ -12,10 +12,11 @@ import {
   PREFERENCE_DIMENSION_LABELS,
   PREFERENCE_DIMENSION_ORDER,
   clearQuestionnaireDraft,
+  loadQuestionnaireDraft,
   normalizeManualWeights,
   rebalanceWeightPercentages,
-  preferenceQuestionnaireDraftKey,
   roundWeightsToPercentages,
+  saveQuestionnaireDraft,
   scorePreferenceAnswers,
 } from "@/lib/preference-questionnaire";
 
@@ -47,12 +48,6 @@ const LEGACY_DIMENSION_COPY: Record<string, [string, string]> = {
 function currentCopy(value: string, legacy?: [string, string]): string {
   return legacy && value === legacy[0] ? legacy[1] : value;
 }
-
-type Draft = {
-  version: string;
-  answers: PreferenceAnswer[];
-  currentIndex: number;
-};
 
 function colorFor(key: string) {
   return DIMENSION_COLORS[key] ?? { solid: "#111827", soft: "#f3f4f6", text: "#374151" };
@@ -103,6 +98,7 @@ export function PreferenceQuestionnaire({
   saved,
   saving,
   onSaveQuestionnaire,
+  onPreviewWeights,
   startImmediately,
 }: {
   sessionId: string;
@@ -113,6 +109,9 @@ export function PreferenceQuestionnaire({
   saved: boolean;
   saving: boolean;
   onSaveQuestionnaire: (answers: PreferenceAnswer[], version: string, manualWeights?: Weights) => Promise<boolean>;
+  /** 四题答完即上报按答案算出的权重（尚未保存）；作答不完整时报 null。
+   *  供填写页摘要卡显示「你的权重：…（尚未保存）」，取代一直挂着的「默认」。 */
+  onPreviewWeights?: (weights: Weights | null) => void;
   startImmediately?: boolean;
 }) {
   const [view, setView] = useState<View>(startImmediately ? "questions" : "intro");
@@ -122,7 +121,7 @@ export function PreferenceQuestionnaire({
   const [manualValues, setManualValues] = useState<Record<string, string>>({});
   const [manualEdited, setManualEdited] = useState(false);
 
-  /* eslint-disable react-hooks/set-state-in-effect -- 从 sessionStorage 恢复问卷草稿。 */
+  /* eslint-disable react-hooks/set-state-in-effect -- 从 localStorage 恢复问卷草稿。 */
   useEffect(() => {
     setView(startImmediately ? "questions" : "intro");
     setAnswers({});
@@ -130,22 +129,16 @@ export function PreferenceQuestionnaire({
     setDraftReady(false);
     setManualValues({});
     setManualEdited(false);
-    if (!definition || typeof window === "undefined") return;
+    if (!definition) return;
 
-    try {
-      const raw = sessionStorage.getItem(preferenceQuestionnaireDraftKey(sessionId));
-      if (raw) {
-        const draft = JSON.parse(raw) as Draft;
-        const valid = draft.version === definition.version
-          && Array.isArray(draft.answers)
-          && draft.answers.every((answer) => answer?.question_id && answer?.choice);
-        if (valid) {
-          setAnswers(Object.fromEntries(draft.answers.map((answer) => [answer.question_id, answer.choice])));
-          setCurrentIndex(Math.min(Math.max(Number(draft.currentIndex) || 0, 0), (definition.questions ?? []).length - 1));
-        }
+    const draft = loadQuestionnaireDraft(sessionId);
+    if (draft) {
+      const valid = draft.version === definition.version
+        && draft.answers.every((answer) => answer?.question_id && answer?.choice);
+      if (valid) {
+        setAnswers(Object.fromEntries(draft.answers.map((answer) => [answer.question_id, answer.choice])));
+        setCurrentIndex(Math.min(Math.max(Number(draft.currentIndex) || 0, 0), (definition.questions ?? []).length - 1));
       }
-    } catch {
-      // 损坏的草稿按空草稿处理，不能阻塞主流程。
     }
     setDraftReady(true);
     setView(startImmediately ? "questions" : "intro");
@@ -153,22 +146,16 @@ export function PreferenceQuestionnaire({
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
-    if (!definition || !draftReady || typeof window === "undefined") return;
-    const key = preferenceQuestionnaireDraftKey(sessionId);
-    try {
-      if (Object.keys(answers).length === 0) {
-        sessionStorage.removeItem(key);
-        return;
-      }
-      const draft: Draft = {
-        version: definition.version,
-        answers: answerList(definition.questions ?? [], answers),
-        currentIndex,
-      };
-      sessionStorage.setItem(key, JSON.stringify(draft));
-    } catch {
-      // sessionStorage 不可用（隐私模式/配额满）：问卷照常作答，只是草稿不持久化
+    if (!definition || !draftReady) return;
+    if (Object.keys(answers).length === 0) {
+      clearQuestionnaireDraft(sessionId);
+      return;
     }
+    saveQuestionnaireDraft(sessionId, {
+      version: definition.version,
+      answers: answerList(definition.questions ?? [], answers),
+      currentIndex,
+    });
   }, [answers, currentIndex, definition, draftReady, sessionId]);
 
   const questions = definition?.questions ?? NO_QUESTIONS;
@@ -182,6 +169,11 @@ export function PreferenceQuestionnaire({
   const manualWeights = manualEdited ? normalizeManualWeights(manualValues) : null;
   const currentQuestion = questions[currentIndex];
   const currentChoice = currentQuestion ? answers[currentQuestion.question_id] : undefined;
+
+  // 已答完未保存的权重变化即上报：摘要卡据此把「默认：34/33/33」换成用户自己的
+  useEffect(() => {
+    onPreviewWeights?.(previewWeights);
+  }, [previewWeights, onPreviewWeights]);
 
   const clearDraft = () => clearQuestionnaireDraft(sessionId);
 
@@ -362,10 +354,15 @@ export function PreferenceQuestionnaire({
                   aria-label={option.label}
                   aria-pressed={selected}
                   onClick={() => selectChoice(option.value)}
-                  className={`min-h-16 rounded-xl border px-3 py-3 text-sm font-semibold transition-colors ${selected ? "text-white" : "border-slate-300 bg-surface text-slate-800 hover:border-slate-400"}`}
+                  className={`min-h-16 rounded-xl border px-3 py-3 text-left text-sm font-semibold transition-colors ${selected ? "text-white" : "border-slate-300 bg-surface text-slate-800 hover:border-slate-400"}`}
                   style={selected ? { borderColor: colors.solid, backgroundColor: colors.solid } : undefined}
                 >
                   {option.label}
+                  {option.description && (
+                    <span className={`mt-1.5 block text-xs font-normal leading-5 ${selected ? "text-white/85" : "text-slate-500"}`}>
+                      {option.description}
+                    </span>
+                  )}
                 </button>
               );
             })}

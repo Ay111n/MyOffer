@@ -8,6 +8,7 @@
  */
 import type { OfferReportView, ResultView } from "@/lib/api/types";
 import { fieldLabel } from "@/lib/constants";
+import { weightPercentText } from "@/lib/preference-questionnaire";
 
 /** 展示分级：仅用于措辞，不参与任何业务判断。 */
 export type StrengthLevel = "toss" | "near" | "moderate" | "clear";
@@ -145,9 +146,14 @@ export type SensitivityFlip = NonNullable<Sensitivity["nearest"]>;
 const pctText = (weight: number) => `${Math.round(weight * 100)}%`;
 const dimLabel = (key: string) => DIMENSIONS.find((d) => d.key === key)?.label ?? key;
 
-/** 一次翻转的人话描述：把「经济回报」降低到 24%（现在 33%）。 */
-export function flipAction(flip: SensitivityFlip): string {
-  return `把「${dimLabel(flip.dimension)}」${flip.direction === "up" ? "提高" : "降低"}到 ${pctText(flip.flip_weight)}（现在 ${pctText(flip.current_weight)}）`;
+/** 一次翻转的人话描述：把「经济回报」降低到 24%（现在 33%）。
+ *  「现在」的展示优先用领先者权重的最大余数法口径（与权重声明行一致，
+ *  避免 37.5% 类值在两处差 1）；翻转目标值是扫描生成的孤立数字，仍走四舍五入。 */
+export function flipAction(flip: SensitivityFlip, weights?: Record<string, number> | null): string {
+  const currentText = weights?.[flip.dimension] != null
+    ? weightPercentText(weights, flip.dimension)
+    : pctText(flip.current_weight);
+  return `把「${dimLabel(flip.dimension)}」${flip.direction === "up" ? "提高" : "降低"}到 ${pctText(flip.flip_weight)}（现在 ${currentText}）`;
 }
 
 /** 「这个结论稳不稳」的标题与一句话解释。offers 用来把 overtaken_by 翻译成 Offer 名。 */
@@ -160,6 +166,7 @@ export function stabilityCopy(
     return offer ? nameOf(offer) : "另一份 Offer";
   };
   const leader = name(sensitivity.leader_id);
+  const leaderWeights = offers.find((item) => item.offer_id === sensitivity.leader_id)?.effective_weights ?? null;
   const min = pctText(sensitivity.weight_min ?? 0.05);
   const max = pctText(sensitivity.weight_max ?? 0.9);
   const near = sensitivity.nearest;
@@ -180,12 +187,12 @@ export function stabilityCopy(
   }
   const result = near.ties ? `会和 ${name(near.overtaken_by)} 并列` : `第一名就会换成 ${name(near.overtaken_by)}`;
   if (sensitivity.status === "fragile") {
-    return { level: "fragile", title: "不太稳", body: `只要${flipAction(near)}，${result}。这个排名跟你怎么权衡强相关，建议认真想想你到底更看重什么。${plane ?? ""}` };
+    return { level: "fragile", title: "不太稳", body: `只要${flipAction(near, leaderWeights)}，${result}。这个排名跟你怎么权衡强相关，建议认真想想你到底更看重什么。${plane ?? ""}` };
   }
   if (sensitivity.status === "moderate") {
-    return { level: "moderate", title: "有一定弹性", body: `如果${flipAction(near)}，${result}。你的偏好需要有明显变化，结论才会反过来。${plane ?? ""}` };
+    return { level: "moderate", title: "有一定弹性", body: `如果${flipAction(near, leaderWeights)}，${result}。你的偏好需要有明显变化，结论才会反过来。${plane ?? ""}` };
   }
-  return { level: "steady", title: "比较稳", body: `要${flipAction(near)}，${result}。这需要你的看法和现在相差很远，结论比较可靠。${plane ?? ""}` };
+  return { level: "steady", title: "比较稳", body: `要${flipAction(near, leaderWeights)}，${result}。这需要你的看法和现在相差很远，结论比较可靠。${plane ?? ""}` };
 }
 
 /** 该用户可读的「信息」条目，严重度分三档。 */

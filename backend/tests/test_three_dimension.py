@@ -371,7 +371,7 @@ def test_export_incomplete_restore_and_old_rejection():
         assert "outputs" not in archive
         assert archive["inputs"]["offers"][0]["company"] == "字节跳动"
         assert archive["inputs"]["offers"][0]["position"] == "后端开发"
-        assert archive["inputs"]["offers"][1]["company"] == "Offer B"
+        assert archive["inputs"]["offers"][1]["company"] == ""
         assert archive["inputs"]["offers"][0]["facts"]["city"]["value"] == "北京"
         assert archive["inputs"]["offers"][0]["facts"]["training_budget_year"]["value"] == 5000
         assert client.post("/api/v1/sessions/restore", json={"format": "myoffer-report-v1"}).status_code == 422
@@ -395,7 +395,7 @@ def test_export_incomplete_restore_and_old_rejection():
         client.post(f"/api/v1/sessions/{new_sid}/questions/stop")
         assert len(client.get(f"/api/v1/sessions/{new_sid}/result").json()["data"]["ranking"]) == 2
         assert client.get(f"/api/v1/sessions/{new_sid}/report/export").status_code == 200
-        # 旧版归档（无身份名字段）仍可导入：空名兜底为槽位默认命名
+        # 旧版归档（无身份名字段）仍可导入：空名保持空串，占位名由展示层回退
         legacy = json.loads(json.dumps(archive))
         for item in legacy["inputs"]["offers"]:
             item.pop("company")
@@ -405,7 +405,7 @@ def test_export_incomplete_restore_and_old_rejection():
         legacy_sid = restored_legacy.json()["data"]["session_id"]
         legacy_names = [o["company"] for o in
                         client.get(f"/api/v1/sessions/{legacy_sid}/offers").json()["data"]]
-        assert legacy_names == ["Offer A", "Offer B"]
+        assert legacy_names == ["", ""]
 
 
 def test_api_complete_report_uses_three_dimensions():
@@ -428,3 +428,54 @@ def test_api_complete_report_uses_three_dimensions():
         assert data["weights"] == {"economic": 0.34, "growth": 0.33, "experience": 0.33}
         assert all(row["housing"]["payment_income_ratio"] is not None for row in data["offers"])
         assert [row["overall_rank"] for row in data["offers"]] == [1, 1]
+
+
+def test_zero_fact_offer_is_excluded_from_scoring_pool():
+    """空 Offer（已添加未填写）不进评分池：加/删它不得改变其他 Offer 的
+    得分（2026-10-28 反馈：空 Offer 曾把全员可比的可选类目门控整体关闭、
+    综合分清空），报告需注明它未纳入比较。"""
+    with TestClient(app) as client:
+        created = client.post("/api/v1/sessions", json={})
+        sid = created.json()["data"]["session_id"]
+        offers = client.get(f"/api/v1/sessions/{sid}/offers").json()["data"]
+        for item in offers:
+            patch = client.patch(f"/api/v1/sessions/{sid}/offers/{item['offer_id']}", json={
+                "version": item["version"],
+                "facts": [{"field_key": key, "value": value} for key, value in BASE.items()],
+            })
+            assert patch.status_code == 200, patch.text
+        baseline = client.get(f"/api/v1/sessions/{sid}/result").json()["data"]
+        assert all(row["overall_score"] is not None for row in baseline["offers"])
+        assert baseline["excluded_offers"] == []
+
+        added = client.post(f"/api/v1/sessions/{sid}/offers", json={})
+        assert added.status_code == 201, added.text
+        after = client.get(f"/api/v1/sessions/{sid}/result").json()["data"]
+        assert after["excluded_offers"] == ["Offer C"]
+        assert [row["offer_id"] for row in after["offers"]] == [row["offer_id"] for row in baseline["offers"]]
+        assert [row["overall_score"] for row in after["offers"]] == [row["overall_score"] for row in baseline["offers"]]
+        assert [row["dimension_scores"] for row in after["offers"]] == [row["dimension_scores"] for row in baseline["offers"]]
+
+
+def test_excluded_offers_carry_slot_names_and_stay_out_of_rows():
+    # 域级：excluded_offers 随 DecisionInput 进入报告 → 取展示名（空名回退
+    # 槽位字母，与 rows 的 display_name 同规则），且不出现在报告行里
+    rules = get_rules()
+    prefs = UserPreferenceInput(weights=rules.default_weights(), buy_house_intent="undecided")
+    empty = OfferInput(offer_id=uuid4(), company="  ", position="", display_order=3)
+    out = evaluate(DecisionInput(offers=[offer(1), offer(2)], preferences=prefs,
+                                 excluded_offers=[empty]), rules)
+    assert out.excluded_offer_names == ["Offer C"]
+    assert {row.display_order for row in out.offers} == {1, 2}
+
+
+def test_all_empty_session_keeps_baseline_report_rows():
+    """全部空白时不排除任何 Offer：基线报告仍是空卡 + 缺口提示（此时没有
+    需要保护的已填 Offer）；部分填写时空 Offer 才被排除出评分池。"""
+    with TestClient(app) as client:
+        created = client.post("/api/v1/sessions", json={})
+        sid = created.json()["data"]["session_id"]
+        assert client.post(f"/api/v1/sessions/{sid}/questions/stop").status_code == 200
+        data = client.get(f"/api/v1/sessions/{sid}/result").json()["data"]
+        assert len(data["offers"]) == 2
+        assert data["excluded_offers"] == []

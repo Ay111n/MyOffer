@@ -1,12 +1,23 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any, Literal
+from datetime import datetime, timezone
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
 from app.domain.contracts import IncomeBreakdown, RawFactInput, UserPreferenceInput
+
+
+def _naive_as_utc(value: datetime) -> datetime:
+    """无时区标记的值按 UTC 解释：SQLite 的 CURRENT_TIMESTAMP 落库/读回都是
+    不带时区的 UTC 文本，直接序列化会给前端一个无后缀 ISO 串，new Date()
+    会把它当本地时间解析（UTC+8 下显示慢 8 小时）。统一补 UTC 后，所有
+    API 时间都带 Z/偏移后缀，与 pipeline 产出的 aware computed_at 同口径。"""
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+
+UTCDatetime = Annotated[datetime, AfterValidator(_naive_as_utc)]
 
 
 class ErrorBody(BaseModel): code:str; message:str; details:dict[str,Any]=Field(default_factory=dict)
@@ -31,6 +42,9 @@ class PreferenceDimensionResource(BaseModel):
 class PreferenceQuestionOption(BaseModel):
     value:str
     label:str
+    # 选项后果说明（如买房题「考虑=把月供压力计入经济回报」），前端渲染在
+    # 选项下方；缺省表示无说明
+    description:str=''
 
 class PreferenceQuestionResource(BaseModel):
     question_id:str
@@ -69,7 +83,7 @@ class MetaResource(BaseModel):
 class MetaResponse(BaseModel): data:MetaResource
 
 class SessionCreateRequest(BaseModel): title:str|None=Field(default=None, max_length=200)
-class SessionResource(BaseModel): session_id:UUID; title:str|None=None; phase:str='completion'; offer_count:int=0; latest_snapshot_seq:int|None=None; pending_confirmations:int=0; created_at:datetime; updated_at:datetime
+class SessionResource(BaseModel): session_id:UUID; title:str|None=None; phase:str='completion'; offer_count:int=0; latest_snapshot_seq:int|None=None; pending_confirmations:int=0; created_at:UTCDatetime; updated_at:UTCDatetime
 class SessionResponse(BaseModel): data:SessionResource
 
 class FactResource(BaseModel): value:Any|None=None; status:str='known'; source:str; reliability:float|None=None
@@ -276,7 +290,7 @@ class ResultView(BaseModel):
     weights：决策维度权重（问卷产出）；ranking：综合评分降序的 offer id；
     insights：模块 key → 服务端生成的洞察文案；
     city_data_version：城市参考数据（费率/房价/生活成本）的版本标注。"""
-    snapshot_seq:int; computed_at:datetime; rule_version:str; trigger_type:str
+    snapshot_seq:int; computed_at:UTCDatetime; rule_version:str; trigger_type:str
     weights:dict[str,float]=Field(default_factory=dict)
     ranking:list[UUID]=Field(default_factory=list)
     overall_scores:dict[str,float]=Field(default_factory=dict)
@@ -288,8 +302,10 @@ class ResultView(BaseModel):
     comparison_note:str=""
     tradeoff:str=""
     sensitivity:SensitivityView|None=None
+    # 零事实 Offer（已添加未填写）的展示名：不进评分池，报告页注明
+    excluded_offers:list[str]=Field(default_factory=list)
 class ResultResponse(BaseModel): data:ResultView
-class HistoryItem(BaseModel): seq:int; created_at:datetime; trigger_type:str; top_offer_id:UUID|None=None; top_score:float|None=None
+class HistoryItem(BaseModel): seq:int; created_at:UTCDatetime; trigger_type:str; top_offer_id:UUID|None=None; top_score:float|None=None
 class HistoryResponse(BaseModel): data:list[HistoryItem]
 
 # ── telemetry：匿名事件批量上报 ─────────────────────────────────

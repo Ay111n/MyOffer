@@ -117,6 +117,7 @@ def build_result_view(snapshot: DecisionSnapshot, rules: RuleSet, seq: int) -> R
         offers=[_offer_view(r) for r in offers],
         insights={},
         sensitivity=compute_sensitivity(offers, dict(outputs.weights)),
+        excluded_offers=list(outputs.excluded_offer_names),
     )
 
 

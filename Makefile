@@ -35,7 +35,7 @@ lint:
 	cd frontend && npm run lint
 
 openapi:
-	cd backend && python -m app.export_openapi > openapi.json
+	cd backend && $(BACKEND_PYTHON) -m app.export_openapi > openapi.json
 	cp backend/openapi.json openapi.json
 
 gen-api: openapi

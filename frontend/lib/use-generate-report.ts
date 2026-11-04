@@ -211,6 +211,19 @@ export function useGenerateReport({
         }
       }
     }
+    // 零 known 事实的 Offer（还没填，或全为待定/不适用）不参与评分，后端会
+    // 把它排除在评分池外。仅「部分填写」时确认——全部空白走基线报告（缺口
+    // 提示本就是主内容），弹窗只会添堵；确认避免「报告里少了一份」没交代。
+    const untouchedNames = targets
+      .filter((o) => !Object.values(o.facts ?? {}).some((f) => f.status === "known" && f.value != null)
+        && !allQuestions.some((q) => Object.values(source[q.question_key]?.[o.offer_id] ?? {})
+          .some((d) => d.status === "known")))
+      .map((o) => o.company.trim() || `Offer ${String.fromCharCode(64 + o.display_order)}`);
+    const participating = targets.length - untouchedNames.length;
+    if (untouchedNames.length > 0 && participating > 0
+      && !window.confirm(`${untouchedNames.join("、")} 还没有填写，将不参与本次比较。继续生成？`)) {
+      return;
+    }
     // 组装批载荷：一题一条 item，answers 内每 Offer 一条。
     // 提交前对草稿条目做引用快照：提交窗口内用户新编辑的字段对象引用已被
     // 替换，清除时按引用一致性区分——已提交的旧编辑清除，窗口内的新编辑保留
@@ -238,8 +251,9 @@ export function useGenerateReport({
       try {
         await submitBatch.mutateAsync({ sessionId, body: { items } });
       } catch (e) {
-        // 原子语义：服务端零写入，草稿全在，修正后重试即可
-        onError(`保存失败：${readApiError(e)}。草稿都还在，修正后重试即可。`);
+        // 原子语义：服务端零写入，草稿全在（404 中间件也不再删除草稿），
+        // 修正后重试即可
+        onError(`保存失败：${readApiError(e)} 已填内容仍保留在本机，修正后重试即可。`);
         return;
       }
       onClearSubmitted(submitted);

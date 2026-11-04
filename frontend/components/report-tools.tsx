@@ -39,7 +39,7 @@ export function ReportRestore() {
 
   return <div className="no-print relative">
     <input ref={input} className="sr-only" type="file" accept=".json,application/json" aria-label="选择输入与偏好文件" onChange={(event) => void restore(event.target.files?.[0])} />
-    <button type="button" disabled={busy} onClick={() => input.current?.click()} className="inline-flex min-h-11 items-center whitespace-nowrap text-sm font-medium text-slate-600 hover:text-ink">{busy ? "导入中…" : "导入数据"}</button>
+    <button type="button" disabled={busy} onClick={() => input.current?.click()} className="inline-flex min-h-11 items-center whitespace-nowrap font-medium text-slate-600 hover:text-ink">{busy ? "导入中…" : "导入数据"}</button>
     {error && <p role="alert" className="absolute right-0 top-full z-40 mt-3 w-64 rounded-lg border border-red-100 bg-surface p-3 text-sm text-red-700 shadow-float">{error}</p>}
   </div>;
 }
@@ -47,6 +47,7 @@ export function ReportRestore() {
 export function ReportExport({ sessionId }: { sessionId: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
 
   async function save() {
     setBusy(true);
@@ -60,6 +61,9 @@ export function ReportExport({ sessionId }: { sessionId: string }) {
       link.download = "MyOffer-输入与偏好.json";
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
+      // 成功也要可见反馈：内嵌浏览器可能拦截下载，用户无从判断是否生效
+      setDone(true);
+      setTimeout(() => setDone(false), 2500);
     } catch (e) {
       setError(readApiError(e));
     } finally {
@@ -67,8 +71,8 @@ export function ReportExport({ sessionId }: { sessionId: string }) {
     }
   }
 
-  return <div className="no-print relative text-sm">
-    <button type="button" disabled={busy || !sessionId} className="inline-flex min-h-11 items-center whitespace-nowrap font-medium text-slate-600 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50" onClick={() => void save()}>{busy ? "导出中…" : "导出数据"}</button>
+  return <div className="no-print relative">
+    <button type="button" disabled={busy || !sessionId} className="inline-flex min-h-11 items-center whitespace-nowrap font-medium text-slate-600 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50" onClick={() => void save()}>{busy ? "导出中…" : done ? "已导出 ✓" : "导出数据"}</button>
     {error && <span role="alert" className="absolute right-0 top-full z-40 mt-3 w-64 rounded-lg border border-red-100 bg-surface p-3 text-sm text-red-700 shadow-float">{error}</span>}
   </div>;
 }

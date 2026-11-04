@@ -1,15 +1,15 @@
 "use client";
 
 /** 单份 Offer 的填写面板：身份改名行 + 三个维度分区，分区内按输入组聚合渲染题列。 */
-import { useEffect, useRef, useState } from "react";
-import { Check, ChevronRight, PencilLine } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronRight, CircleAlert, PencilLine } from "lucide-react";
 
 import type { FieldDraft, OfferResource, RenderedQuestion } from "@/lib/api/types";
 import { usePatchOffer } from "@/lib/api/hooks";
 import { useFlowStore } from "@/stores/flow-store";
 import { offerColor } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { OfferColumn, questionStatusForOffer, type NodeDraft } from "@/components/question-parts";
+import { OfferColumn, REQUIRED_FIELDS, serverFieldDraft, type NodeDraft } from "@/components/question-parts";
 
 export type DisplayArea = { key: string; label: string; questions: RenderedQuestion[] };
 
@@ -35,7 +35,7 @@ const INPUT_GROUPS: Record<string, { label: string; fields: Set<string> }[]> = {
   ],
 };
 
-/** 身份改名行：公司名（必填，strip 后非空）+ 岗位（选填，可清空）。
+/** 身份改名行：公司名（选填，留空时展示层回退「Offer A/B」）+ 岗位（选填，可清空）。
  *  失焦或回车保存；改名走 PATCH 只更新身份，不重算评分。 */
 function OfferIdentityRow({ offer }: { offer: OfferResource }) {
   const sessionId = useFlowStore((s) => s.sessionId);
@@ -43,6 +43,8 @@ function OfferIdentityRow({ offer }: { offer: OfferResource }) {
   const [company, setCompany] = useState(offer.company);
   const [position, setPosition] = useState(offer.position);
   const [saved, setSaved] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+  const fallbackName = `Offer ${String.fromCharCode(64 + offer.display_order)}`;
   // 服务端值变化（如保存成功后重取）时同步输入框；正在编辑时不打断
   const editingRef = useRef(false);
   useEffect(() => {
@@ -76,12 +78,16 @@ function OfferIdentityRow({ offer }: { offer: OfferResource }) {
       {
         onSuccess: () => {
           setSaved(true);
+          setSaveFailed(false);
           window.setTimeout(() => setSaved(false), 1600);
         },
         onError: () => {
-          // 版本冲突或其他失败：回退为服务端现值，由 invalidate 带回最新 version
+          // 版本冲突或其他失败：回退为服务端现值，由 invalidate 带回最新
+          // version。失败必须可见——静默回退曾让「刚输入的公司名消失」
+          // 毫无交代（2026-10-28 反馈）。
           setCompany(offer.company);
           setPosition(offer.position);
+          setSaveFailed(true);
         },
       },
     );
@@ -105,11 +111,11 @@ function OfferIdentityRow({ offer }: { offer: OfferResource }) {
           disabled={pending}
           maxLength={200}
           placeholder="例如：字节跳动"
-          onFocus={() => { editingRef.current = true; }}
+          onFocus={() => { editingRef.current = true; setSaveFailed(false); }}
           onChange={(e) => setCompany(e.target.value)}
           onBlur={() => save(company, position)}
           onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-          aria-label={`${offer.company} 的公司名称`}
+          aria-label={`${offer.company || fallbackName} 的公司名称`}
           className="min-h-11 w-full rounded-lg border border-hairline bg-white px-3 text-base text-ink outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10 disabled:opacity-60"
         />
       </label>
@@ -121,11 +127,11 @@ function OfferIdentityRow({ offer }: { offer: OfferResource }) {
           disabled={pending}
           maxLength={200}
           placeholder="例如：后端开发"
-          onFocus={() => { editingRef.current = true; }}
+          onFocus={() => { editingRef.current = true; setSaveFailed(false); }}
           onChange={(e) => setPosition(e.target.value)}
           onBlur={() => save(company, position)}
           onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-          aria-label={`${offer.company} 的岗位`}
+          aria-label={`${offer.company || fallbackName} 的岗位`}
           className="min-h-11 w-full rounded-lg border border-hairline bg-white px-3 text-base text-ink outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10 disabled:opacity-60"
         />
       </label>
@@ -140,10 +146,15 @@ function OfferIdentityRow({ offer }: { offer: OfferResource }) {
             <Check aria-hidden="true" className="h-3.5 w-3.5" />
             已保存
           </span>
+        ) : saveFailed ? (
+          <span className="flex items-center gap-1 text-red-600">
+            <CircleAlert aria-hidden="true" className="h-3.5 w-3.5" />
+            保存失败
+          </span>
         ) : (
           <span className="flex items-center gap-1 text-slate-400">
             <PencilLine aria-hidden="true" className="h-3.5 w-3.5" />
-            失焦保存
+            自动保存
           </span>
         )}
       </span>
@@ -157,24 +168,41 @@ export function OfferPanel({
   expanded,
   onToggleSection,
   onDraftChange,
+  onNotice,
   mergedDraftOf,
   drafts,
 }: {
   offer: OfferResource;
   areas: DisplayArea[];
   expanded: Record<string, boolean>;
-  onToggleSection: (key: string, areaKey: string | null) => void;
+  onToggleSection: (key: string) => void;
   onDraftChange: (qkey: string, oid: string, fk: string, d: FieldDraft | null) => void;
+  /** 非阻塞信息提示（2s toast），透传给字段列的跨题联动反馈。 */
+  onNotice?: (text: string) => void;
   mergedDraftOf: (q: RenderedQuestion, oid: string) => Record<string, FieldDraft>;
   /** 与 Offer 卡片角标同源：进度只统计用户编辑/服务端已答，不含默认值 */
   drafts: NodeDraft;
 }) {
   const oid = offer.offer_id;
+  // 月薪现值（用户草稿优先，回退服务端）：年终奖「倍数」模式的换算提示用。
+  // monthly_base 与年终奖不在同一道题里，只能在这里跨题取值下传。
+  const monthlyBase = useMemo(() => {
+    for (const area of areas) {
+      for (const q of area.questions) {
+        if (!(q.fields ?? []).some((f) => f.field_key === "monthly_base")) continue;
+        const d = drafts[q.question_key]?.[oid]?.monthly_base;
+        if (d) return d.status === "known" && typeof d.value === "number" ? d.value : null;
+        const server = offer.facts?.monthly_base;
+        return typeof server === "number" ? server : null;
+      }
+    }
+    return null;
+  }, [areas, drafts, offer, oid]);
   return (
     <div>
       <section
       id="offer-panel"
-      aria-label={offer.company + " · 信息填写"}
+      aria-label={(offer.company || `Offer ${String.fromCharCode(64 + offer.display_order)}`) + " · 信息填写"}
       className="min-w-0 animate-panel-in overflow-hidden rounded-card border border-hairline bg-surface"
     >
       <div className="divide-y divide-hairline">
@@ -184,13 +212,21 @@ export function OfferPanel({
         {areas.map((area, index) => {
           const key = `${oid}:${area.key}`;
           const open = Boolean(expanded[key]);
+          // 分区头只报必填进度：全部字段数（含选填）的分母把「其实只需 7 项」
+          // 藏起来，还会随联动字段增减（2026-10-27 试用反馈）。
           const progress = area.questions.reduce((acc, q) => {
-            const p = questionStatusForOffer(q, oid, drafts);
-            return { answered: acc.answered + p.answered, total: acc.total + p.total };
+            for (const field of q.fields ?? []) {
+              if (!REQUIRED_FIELDS.has(field.field_key)) continue;
+              const d = drafts[q.question_key]?.[oid]?.[field.field_key]
+                ?? serverFieldDraft(q, oid, field.field_key);
+              if (d?.status === "known" && d.value !== null && d.value !== "") acc.answered += 1;
+              acc.total += 1;
+            }
+            return acc;
           }, { answered: 0, total: 0 });
           return (
             <div key={area.key} id={`section-${oid}-${area.key}`}>
-              <SectionRow label={area.label} index={index + 1} progress={progress} open={open} onToggle={() => onToggleSection(key, null)} />
+              <SectionRow label={area.label} index={index + 1} progress={progress} open={open} onToggle={() => onToggleSection(key)} />
               {open && (
                 <div className="border-t border-hairline bg-white px-4 py-1 sm:px-6">
                   {INPUT_GROUPS[area.key].map((group) => {
@@ -198,7 +234,7 @@ export function OfferPanel({
                     if (!questions.length) return null;
                     return <div key={group.label} className="border-b border-slate-100 py-4 last:border-0">
                       <h3 className="mb-2 text-xs font-semibold tracking-[0.12em] text-slate-500">{group.label}</h3>
-                      {questions.map((q) => <OfferColumn key={q.question_key} qkey={q.question_key} oid={oid} name="" showHeader={false} fields={q.fields} draft={mergedDraftOf(q, oid)} onDraftChange={onDraftChange} />)}
+                      {questions.map((q) => <OfferColumn key={q.question_key} qkey={q.question_key} oid={oid} name="" showHeader={false} fields={q.fields} draft={mergedDraftOf(q, oid)} onDraftChange={onDraftChange} onNotice={onNotice} monthlyBase={monthlyBase} />)}
                     </div>;
                   })}
                 </div>
@@ -230,7 +266,7 @@ function SectionRow({ label, index, progress, open, onToggle }: {
     >
       <span aria-hidden="true" className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold tabular-nums", open ? "bg-ink text-white" : "bg-slate-100 text-slate-500")}>{index}</span>
       <span className="flex-1 text-base font-semibold text-ink">{label}</span>
-      <span className="text-xs tabular-nums text-slate-500">{progress.answered}/{progress.total}</span>
+      <span className="text-xs tabular-nums text-slate-500">必填 {progress.answered}/{progress.total}</span>
       <ChevronRight className={`shrink-0 text-neutral-400 transition-transform duration-200 ${open ? "rotate-90" : ""}`} />
     </button>
   );

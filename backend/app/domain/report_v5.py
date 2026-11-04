@@ -428,6 +428,12 @@ def build_report(inp: DecisionInput, rules: RuleSet) -> ReportOutputs:
             housing=housing or _housing_module(scored, rules, ctx, None, None, "not_consider"),
         ))
     rows, ranking = _rank_rows(rows)
+    # 被排除的零事实 Offer 按展示口径取名（与 rows 的 display_name 同规则），
+    # 报告页据此注明「未纳入本次比较」
+    excluded_names = [
+        offer.company.strip() or f"Offer {chr(65 + offer.display_order - 1)}"
+        for offer in inp.excluded_offers
+    ]
     return ReportOutputs(weights=weights, ranking=ranking,
                          city_data_version=str(rules.data.get("city_index", {}).get("meta", {}).get("version", "")),
-                         offers=rows)
+                         offers=rows, excluded_offer_names=excluded_names)

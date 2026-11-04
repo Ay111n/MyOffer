@@ -38,6 +38,10 @@ class UserPreferenceInput(FrozenModel):
 
 class DecisionInput(FrozenModel):
     offers: list[OfferInput]; preferences: UserPreferenceInput
+    # 零事实 Offer（已添加未填写）不进评分池：留在池里会把全员可比的可选
+    # 类目整体关掉、并让综合分判定永远不满足，空 Offer 的存在/消失会改变
+    # 其他 Offer 的得分。仍随快照携带，供报告注明「未纳入本次比较」。
+    excluded_offers: list[OfferInput] = Field(default_factory=list)
 
 # ── 报告输出契约（v5 三维评分）──────────────────────────────────
 class MonthSalaryRow(FrozenModel):
@@ -132,6 +136,8 @@ class ReportOutputs(FrozenModel):
     ranking: list[UUID] = Field(default_factory=list)         # 综合评分降序
     city_data_version: str | None = None                      # 城市参考数据版本（展示口径）
     offers: list[OfferReport] = Field(default_factory=list)
+    # 被排除的零事实 Offer 展示名（槽位字母或用户命名），报告页据此注明
+    excluded_offer_names: list[str] = Field(default_factory=list)
 
 class DecisionSnapshot(FrozenModel):
     # v4 调整收入、评分与质量口径；旧 payload 由路由层显式拒绝。

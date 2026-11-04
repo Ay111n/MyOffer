@@ -30,10 +30,10 @@ def test_create_third_offer_then_limit_conflict():
     r = client.post(f"/api/v1/sessions/{sid}/offers", json={})
     assert r.status_code == 201, r.text
     body = r.json()
-    assert body["data"]["company"] == "Offer C"
+    assert body["data"]["company"] == ""
     assert body["decision"]["snapshot_seq"] >= 1
 
-    # 空公司名 → 按空位序号默认命名（第 3 空位 → Offer C）
+    # 新建 Offer 公司名同样留空（占位名由展示层回退）
     r2 = client.post(f"/api/v1/sessions/{sid}/offers", json={})
     assert r2.status_code == 409
     assert r2.json()["error"]["code"] == "offer_limit_reached"
@@ -51,7 +51,7 @@ def test_patch_identity_and_facts_with_optimistic_lock():
     })
     assert r.status_code == 200, r.text
     data = r.json()["data"]
-    assert data["company"] == "Offer A"
+    assert data["company"] == ""
     assert data["version"] == version + 1
     assert data["facts"]["monthly_base"]["value"] == 20000
 
@@ -112,7 +112,7 @@ def test_delete_offer_compacts_labels_and_preserves_surviving_data(deleted_index
     deleted = client.delete(f"/api/v1/sessions/{sid}/offers/{originals[deleted_index]['offer_id']}")
     assert deleted.status_code == 200, deleted.text
     remaining = _list_offers(client, sid)
-    assert [offer["company"] for offer in remaining] == ["Offer A", "Offer B"]
+    assert [offer["company"] for offer in remaining] == ["", ""]
     assert [offer["display_order"] for offer in remaining] == [1, 2]
     for slot, (before, after) in enumerate(zip(survivors, remaining, strict=True), start=1):
         assert after["offer_id"] == before["offer_id"]
@@ -121,12 +121,13 @@ def test_delete_offer_compacts_labels_and_preserves_surviving_data(deleted_index
 
     snapshot = client.get(f"/api/v1/sessions/{sid}/result").json()["data"]
     ordered = sorted(snapshot["offers"], key=lambda offer: offer["display_order"])
+    # 快照报告行永远带可读称呼：空名在报告层兜底为槽位名（与归档的空串不同）
     assert [offer["company"] for offer in ordered] == ["Offer A", "Offer B"]
     assert [offer["offer_id"] for offer in ordered] == [offer["offer_id"] for offer in survivors]
 
     added = client.post(f"/api/v1/sessions/{sid}/offers", json={})
     assert added.status_code == 201, added.text
-    assert added.json()["data"]["company"] == "Offer C"
+    assert added.json()["data"]["company"] == ""
     assert [offer["display_order"] for offer in _list_offers(client, sid)] == [1, 2, 3]
 
 
@@ -158,7 +159,7 @@ def test_reset_offer_keeps_slot_and_other_offer_but_removes_its_answers():
     now, untouched = _list_offers(client, sid)
     assert now["offer_id"] == oid
     assert now["display_order"] == first["display_order"]
-    assert now["company"] == "Offer A" and now["position"] == "" and now["facts"] == {}
+    assert now["company"] == "" and now["position"] == "" and now["facts"] == {}
     assert untouched == other.json()["data"]
     assert all(x["offer_id"] != oid for x in client.get(
         f"/api/v1/sessions/{sid}/due-diligence").json()["data"]["items"])
@@ -200,10 +201,15 @@ def test_patch_rename_only_bumps_version_without_new_snapshot():
 def test_patch_rename_same_identity_is_idempotent():
     client, sid = _client_with_session()
     offer = _list_offers(client, sid)[0]
+    # 种子名为空：先改成具名（版本 +1），再以同名重复提交 → 幂等不升版本
+    named = client.patch(f"/api/v1/sessions/{sid}/offers/{offer['offer_id']}", json={
+        "version": offer["version"], "company": "字节跳动"})
+    assert named.status_code == 200, named.text
+    assert named.json()["data"]["version"] == offer["version"] + 1
     r = client.patch(f"/api/v1/sessions/{sid}/offers/{offer['offer_id']}", json={
-        "version": offer["version"], "company": "Offer A"})
+        "version": offer["version"] + 1, "company": "字节跳动"})
     assert r.status_code == 200, r.text
-    assert r.json()["data"]["version"] == offer["version"]
+    assert r.json()["data"]["version"] == offer["version"] + 1
 
 
 def test_patch_rename_blank_company_rejected():
@@ -216,7 +222,7 @@ def test_patch_rename_blank_company_rejected():
         assert r.json()["error"]["code"] == "invalid_company"
     # 被拒后名称与版本未动
     now = _list_offers(client, sid)[0]
-    assert now["company"] == "Offer A" and now["version"] == offer["version"]
+    assert now["company"] == "" and now["version"] == offer["version"]
 
 
 def test_patch_rename_in_results_phase_keeps_phase():

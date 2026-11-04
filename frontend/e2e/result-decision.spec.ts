@@ -1,9 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
+import { fillExampleFactsViaApi } from "./helpers";
 
 async function generateSampleReport(page: Page) {
   await page.goto("/");
   await expect(page.getByRole("button", { name: /Offer B.*0\/7/ })).toBeVisible();
-  await page.getByRole("button", { name: "填入示例数据" }).click();
+  await fillExampleFactsViaApi(page);
   await expect(page.getByRole("button", { name: /Offer A.*7\/7/ })).toBeVisible();
   await page.getByRole("button", { name: /点击测试我更在意什么/ }).click();
   for (let index = 0; index < 3; index++) {

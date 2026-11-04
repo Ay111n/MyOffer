@@ -30,7 +30,7 @@ for (const [name, size] of [["桌面", { width: 1440, height: 900 }], ["手机",
       if (await heading.getAttribute("aria-expanded") !== "true") await heading.click();
       await expect(page.locator(`[data-field-anchor="${offers[0].offer_id}:${field}"] .form-label`)).toContainText("*");
     }
-    await page.getByRole("button", { name: "经济回报", exact: true }).click();
+    // 手风琴已允许多开：三个分区在上面的循环里均已展开，无需再点击切换
     await expect(page.getByText("政府人才补贴")).toBeVisible();
     for (const offer of offers) {
       const response = await page.request.patch(`/api/v1/sessions/${sid}/offers/${offer.offer_id}`, { data: {

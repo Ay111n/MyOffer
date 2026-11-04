@@ -21,6 +21,8 @@ test("报告后可继续填写并重新计算", async ({ page }) => {
   await page.waitForURL(/\/complete/);
   await page.getByRole("spinbutton", { name: "税前月薪" }).fill("20000");
   await page.getByRole("spinbutton", { name: "固定薪数" }).fill("12");
+  // 此时 Offer B 仍未填写：空 Offer 不参与评分的确认弹窗需要接受
+  page.on("dialog", (dialog) => void dialog.accept());
   await page.getByRole("button", { name: "生成对比报告" }).click();
   await page.waitForURL(/\/results/);
   await expect(page.getByRole("heading", { name: "三维对比报告" })).toBeVisible();

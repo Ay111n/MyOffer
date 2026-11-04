@@ -1,6 +1,7 @@
 "use client";
 
 import { useId } from "react";
+import { createPortal } from "react-dom";
 import { Info } from "lucide-react";
 
 import { offerColor } from "@/lib/constants";
@@ -57,6 +58,29 @@ export function Card({ children, className, interactive, id }: { children: React
 /** 错误提示：role="alert" 让屏幕阅读器立即播报。带图形前缀，不只靠颜色。 */
 export function ErrorText({ children, className }: { children: React.ReactNode; className?: string }) {
   return <p role="alert" className={cn("rounded-lg border-l-2 border-red-600 bg-red-50 px-3 py-2 text-sm text-red-700", className)}>{children}</p>;
+}
+
+/**
+ * 轻量非阻塞提示（信息类通知，如「上一份 Offer 还没有可带入的内容」）：
+ * 出现在当前视口正中，2s 后自动淡出；整层 pointer-events-none，不拦截任何点击。
+ * 与 ErrorText 的分工：通知完即逝的用 Toast，需要用户处理直到解决的用 ErrorText。
+ *
+ * 两点实现约束（都有实测教训）：
+ * - 必须 portal 到 body：页面根节点带 animate-fade-up 入场动画，其 transform
+ *   （哪怕结束在恒等矩阵）会把 position:fixed 的包含块从视口改成那个高个子
+ *   祖先——toast 实测被定位到视口外 1900px 处（2026-10-28 用户实机报告）；
+ * - 位置为视口正中（用户指定），不要改回 bottom 定位。
+ */
+export function Toast({ message }: { message: string | null }) {
+  if (typeof document === "undefined" || !message) return null;
+  return createPortal(
+    <div aria-live="polite" className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center px-4">
+      <p className="toast-fade max-w-md rounded-card border border-hairline bg-surface px-5 py-3 text-center text-sm leading-5 text-ink shadow-float">
+        {message}
+      </p>
+    </div>,
+    document.body,
+  );
 }
 
 export function Badge({

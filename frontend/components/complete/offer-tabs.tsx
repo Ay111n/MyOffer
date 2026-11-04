@@ -92,6 +92,8 @@ export function OfferTabs({
         const progress = offerProgress(questions, o.offer_id, drafts);
         const state = progressStateOf(progress);
         const dot = PROGRESS_DOT[state];
+        // 公司名留空时回退占位名（与报告页 nameOf 同口径）
+        const displayName = o.company || `Offer ${String.fromCharCode(64 + o.display_order)}`;
         return (
           <div key={o.offer_id} className="relative min-w-0 flex-1 basis-40">
             <button
@@ -115,7 +117,7 @@ export function OfferTabs({
                 {AVATAR_LETTERS[i % AVATAR_LETTERS.length]}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block break-words text-base font-semibold">{o.company}</span>
+                <span className="block break-words text-base font-semibold">{displayName}</span>
                 <span className="mt-0.5 block text-xs font-normal tabular-nums text-slate-500">{PROGRESS_TEXT[state]} · {progress.answered}/{progress.total}</span>
               </span>
               <span
@@ -129,7 +131,7 @@ export function OfferTabs({
             {canDelete && (
               <button
                 type="button"
-                aria-label={"删除 " + o.company}
+                aria-label={"删除 " + displayName}
                 title="删除该 Offer"
                 disabled={deletingId === o.offer_id}
                 onClick={() => onDelete(o.offer_id)}

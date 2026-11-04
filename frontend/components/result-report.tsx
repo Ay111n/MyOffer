@@ -9,6 +9,7 @@ import Link from "next/link";
 import { ArrowRight, Check, CircleAlert, Info, TriangleAlert } from "lucide-react";
 import type { OfferReportView } from "@/lib/api/types";
 import { fieldLabel, offerColor } from "@/lib/constants";
+import { weightPercentText } from "@/lib/preference-questionnaire";
 import { cn } from "@/lib/utils";
 import {
   DIMENSIONS,
@@ -63,7 +64,7 @@ export function VerdictHero({ verdict }: { verdict: Verdict }) {
   if (verdict.kind === "unranked") {
     const first = verdict.blockers[0];
     return (
-      <section aria-labelledby="verdict-section-title" className="border-t border-hairline py-10">
+      <section id="verdict" aria-labelledby="verdict-section-title" className="border-t border-hairline py-10">
         <h2 id="verdict-section-title" className="section-title">当前结论</h2>
         <h3 id="verdict-title" className="display mt-4">还不能下结论</h3>
         <p className="prose-cn mt-5 text-base text-slate-700">
@@ -88,7 +89,7 @@ export function VerdictHero({ verdict }: { verdict: Verdict }) {
   const scaleIndex = STRENGTH_SCALE.findIndex((item) => item.level === strength.level);
 
   return (
-    <section aria-labelledby="verdict-section-title" className="border-t border-hairline py-10">
+    <section id="verdict" aria-labelledby="verdict-section-title" className="border-t border-hairline py-10">
       <h2 id="verdict-section-title" className="section-title">当前结论</h2>
       <div className="mt-4 grid gap-10 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-end">
         <div className="min-w-0">
@@ -149,9 +150,11 @@ export function Reasons({
   const leaderColor = offerColor(leader.display_order);
   const otherColor = offerColor(other.display_order);
   const heading = verdict.tied ? "它们各自赢在哪里" : `为什么是 ${nameOf(leader)}`;
+  // 与权重声明行同口径（最大余数法），避免 37.5% 类值在两处差 1
+  const weightText = (key: string) => weightPercentText(leader.effective_weights, key);
 
   return (
-    <section aria-labelledby="why-title" className="border-t border-hairline py-10">
+    <section id="why" aria-labelledby="why-title" className="border-t border-hairline py-10">
       <h2 id="why-title" className="section-title">{heading}</h2>
       <p className="section-lede mt-2">{reasonSentence(rows, nameOf(leader), nameOf(other))}</p>
 
@@ -175,7 +178,7 @@ export function Reasons({
               <li key={row.key} className="grid gap-x-6 gap-y-2 py-5 md:grid-cols-[10rem_minmax(0,1fr)_9rem] md:items-center">
                 <div>
                   <p className="text-base font-semibold text-ink">{row.label}</p>
-                  <p className="text-xs text-slate-500">你的权重 {pct(row.weight)}</p>
+                  <p className="text-xs text-slate-500">你的权重 {weightText(row.key)}</p>
                 </div>
                 <div className="min-w-0">
                   <div
@@ -211,7 +214,7 @@ export function Reasons({
           })}
         </ul>
         <p className="mt-3 text-xs leading-5 text-slate-500">
-          条形表示该维度按你的权重折算后，拉开了多少综合分。向哪边延伸，就是哪边在这一项上占优。
+          行序按对综合分差异的影响从大到小排列。条形表示该维度按你的权重折算后，拉开了多少综合分。向哪边延伸，就是哪边在这一项上占优。
         </p>
       </div>
     </section>
@@ -236,7 +239,7 @@ export function Scoreboard({ offers }: { offers: OfferReportView[] }) {
             <div className="flex items-center justify-between gap-3">
               <p className="flex min-w-0 items-center gap-2 text-sm text-slate-600">
                 <Letter offer={offer} />
-                <span className="truncate">OFFER {letterOf(offer)} · {offer.city || "城市待填"}</span>
+                <span className="truncate">{nameOf(offer)} · {offer.city || "城市待填"}</span>
               </p>
               {offer.overall_rank != null && (
                 <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
@@ -291,7 +294,9 @@ function keyRows(offers: OfferReportView[]): KeyRow[] {
     hint: "名义数字，没扣税",
   });
   const annual = offers.map((offer) => num(offer, "annual_net"));
-  rows.push({ label: "每年税后现金", values: annual.map(money), best: bestIndexes(annual, "higher"), hint: "固定薪资，不含年终奖" });
+  // 行名与口径注释对齐：只算固定薪资，避免「每年税后现金」暗示全年到手
+  // 而与下方「常规年度税后现金」（含年终奖）混淆（2026-10-27 试用反馈）
+  rows.push({ label: "固定年薪后现金", values: annual.map(money), best: bestIndexes(annual, "higher"), hint: "只算固定薪资，不含年终奖" });
   const power = offers.map((offer) => num(offer, "purchasing_power_monthly"));
   rows.push({ label: "城市调整后月购买力", values: power.map(money), best: bestIndexes(power, "higher"), hint: "到手的钱在当地能买多少" });
   const entry = offers.map((offer) => num(offer, "entry_income_nominal"));
@@ -313,9 +318,9 @@ export function KeyNumbers({ offers }: { offers: OfferReportView[] }) {
   const rows = keyRows(offers).filter((row) => row.values.some((value) => value !== "—" && !value.startsWith("—")));
   if (rows.length === 0) return null;
   return (
-    <section aria-labelledby="diff-title" className="border-t border-hairline py-10">
+    <section id="diff" aria-labelledby="diff-title" className="border-t border-hairline py-10">
       <h2 id="diff-title" className="section-title">差异在哪里</h2>
-      <p className="section-lede mt-2">分数背后的几个真实数字。较优的一项会标注「较优」。</p>
+      <p className="section-lede mt-2">较优的一项会标注「较优」。</p>
       <div role="region" aria-label="关键指标横向对比" className="mt-6 overflow-x-auto">
         <table className="w-full min-w-[320px] border-collapse text-left">
           <thead>
@@ -375,7 +380,7 @@ export function Stability({ offers, sensitivity }: { offers: OfferReportView[]; 
   const showTracks = sensitivity.status !== "tie" && leader;
 
   return (
-    <section aria-labelledby="stability-title" className="border-t border-hairline py-10">
+    <section id="stability" aria-labelledby="stability-title" className="border-t border-hairline py-10">
       <h2 id="stability-title" className="section-title">这个结论稳不稳</h2>
       <p className="mt-4 flex items-baseline gap-3">
         <span className={cn("text-2xl font-bold tracking-tight", tone.tag)}>{copy.title}</span>
@@ -403,7 +408,7 @@ export function Stability({ offers, sensitivity }: { offers: OfferReportView[]; 
                 <li key={key} className="grid gap-x-6 gap-y-2 py-4 md:grid-cols-[10rem_minmax(0,1fr)] md:items-center">
                   <div>
                     <p className="text-base font-semibold text-ink">{label}</p>
-                    <p className="text-xs text-slate-500">现在占 {pct(current)}</p>
+                    <p className="text-xs text-slate-500">现在占 {leader.effective_weights ? weightPercentText(leader.effective_weights, key) : pct(current)}</p>
                   </div>
                   <div className="min-w-0">
                     <div role="img" aria-label={summary} className="relative h-8">
@@ -449,9 +454,10 @@ export function Stability({ offers, sensitivity }: { offers: OfferReportView[]; 
               );
             })}
           </ul>
-          <Link href="/#preferences" className="no-print mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-medium text-blue-700 hover:text-blue-800">
+          <Link href="/#preferences" className="no-print mt-4 inline-flex min-h-11 flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-medium text-blue-700 hover:text-blue-800">
             到「你的偏好」里试试不同的权重
             <ArrowRight aria-hidden="true" className="h-4 w-4" />
+            <span className="text-xs font-normal text-slate-500">（会离开本页，报告可随时重新生成）</span>
           </Link>
         </div>
       )}
@@ -470,9 +476,8 @@ const NOTICE_STYLE: Record<Notice["level"], { label: string; Icon: typeof Info; 
 export function Reliability({ offers, verdict }: { offers: OfferReportView[]; verdict: Verdict }) {
   const notices = buildNotices(offers, verdict);
   return (
-    <section aria-labelledby="reliability-title" className="border-t border-hairline py-10">
+    <section id="reliability" aria-labelledby="reliability-title" className="border-t border-hairline py-10">
       <h2 id="reliability-title" className="section-title">这个结论靠不靠谱</h2>
-      <p className="section-lede mt-2">看看有哪些地方是估算、没填或需要向公司核实的。</p>
       {notices.length === 0 ? (
         <p className="mt-6 flex items-start gap-2 text-sm text-slate-700">
           <Check aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
@@ -504,9 +509,8 @@ export function Reliability({ offers, verdict }: { offers: OfferReportView[]; ve
 export function NextSteps({ offers }: { offers: OfferReportView[] }) {
   const gaps = infoGaps(offers).slice(0, 3);
   return (
-    <section aria-labelledby="next-title" className="no-print border-t border-hairline py-10">
+    <section id="next" aria-labelledby="next-title" className="no-print border-t border-hairline py-10">
       <h2 id="next-title" className="section-title">接下来可以做什么</h2>
-      <p className="section-lede mt-2">补充后回到填写页重新生成报告，结论会自动更新。</p>
       <ul className="mt-6 divide-y divide-hairline border-y border-hairline">
         {gaps.map((gap) => (
           <li key={`${gap.offer.offer_id}-${gap.field}`}>
@@ -525,7 +529,7 @@ export function NextSteps({ offers }: { offers: OfferReportView[] }) {
           <Link href="/#preferences" className="group flex min-h-14 items-center justify-between gap-4 py-4">
             <span className="min-w-0">
               <span className="block text-base font-medium text-ink">重新想一想你更看重什么</span>
-              <span className="mt-0.5 block text-sm text-slate-500">调整三个维度的权重，看排名会不会变</span>
+              <span className="mt-0.5 block text-sm text-slate-500">调整三个维度的权重，看排名会不会变（会回到填写页）</span>
             </span>
             <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400 transition-colors group-hover:text-ink" />
           </Link>

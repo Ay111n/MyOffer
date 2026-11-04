@@ -1,9 +1,15 @@
 import createClient from 'openapi-fetch'; import type {paths} from './schema';
 import { useFlowStore } from '@/stores/flow-store';
-import { clearLocalWorkspace } from '@/stores/flow-store';
 export const api=createClient<paths>({baseUrl:'',credentials:'include'});
 
-/** 清掉当前页面里的失效工作区；非首页整页跳转到新的填写流程。 */
+/** 会话失效提示标记：discardLocalSession 写入，填写页读到后 toast 一次性
+ *  清除——把「静默弹回首页」变成有交代（2026-10-28 反馈）。 */
+export const SESSION_EXPIRED_FLAG = "myoffer_session_expired";
+
+/** 解除当前页面里的失效会话绑定；非首页整页跳转到新的填写流程。
+ *  只解除绑定，不删本机草稿：服务端丢状态（重启/替换/清理）不应连用户
+ *  在浏览器里的内容陪葬。旧草稿由填写页的「恢复上次填写」横幅接管
+ *  （listOrphanDraftSessions），24h TTL 到期自然淘汰。 */
 function discardLocalSession(): void {
   // 清理旧版本留下的 localStorage，当前版本不再读它。
   // 存储访问本身可能抛异常（严格隐私设置禁用存储）——其余存储触点都有
@@ -13,10 +19,14 @@ function discardLocalSession(): void {
   } catch {
     // 存储不可用：清状态照常进行（内存态仍会重置）
   }
-  // 一并清掉本机持久痕迹（跨标签会话记录 + 未提交草稿），避免回到首页后
-  // 又把已失效会话的草稿恢复出来
-  clearLocalWorkspace();
+  try {
+    sessionStorage.setItem(SESSION_EXPIRED_FLAG, "1");
+  } catch {
+    // 存储不可用：提示缺席，不影响回退本身
+  }
   useFlowStore.getState().enterSession(null);
+  // 身份失效时整页重载，同时销毁 React Query 缓存和模块内状态，避免沿用旧身份数据。
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- 此处需要完整页面重载来隔离身份状态。
   if (window.location.pathname !== "/") window.location.assign("/");
 }
 

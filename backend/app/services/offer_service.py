@@ -1,8 +1,8 @@
 """Offer 与 RawFact 写入服务。
 
 原则：
-- offers 表只存身份字段（company/position，均选填——留空时按空位序号
-  填默认值 公司1/2/3、岗位A/B/C）；其余全部事实走问题作答或 PATCH facts。
+- offers 表只存身份字段（company/position 均选填，留空即空串，展示层
+  统一回退为「Offer A/B/C」占位名）；其余全部事实走问题作答或 PATCH facts。
 - PATCH facts 是全 API 唯一直接写事实的入口（问题作答端点除外）。
 - 每个写操作 = 全局 DbGate → 写入 → evaluate → 快照 → commit。
 """
@@ -108,8 +108,9 @@ def create_offer(
     offer = Offer(
         session_id=session.id,
         display_order=slot,
-        # v0.6：默认以 Offer A/B/C 指代候选项；公司岗位均为选填改名入口
-        company=f"Offer {chr(64 + slot)}",
+        # 公司名留空（占位名由展示层回退）：预填真值会被误当作已填写内容
+        # 带进报告与导出（2026-10-27 试用反馈）
+        company="",
         position="",
     )
     db.add(offer)
@@ -273,7 +274,7 @@ def reset_offer(
         raise _conflict("version_conflict", "Offer was modified by another client",
                         {"current_version": offer.version})
 
-    default_company = f"Offer {chr(64 + offer.display_order)}"
+    default_company = ""
     facts = _offer_facts(db, oid)
     states = db.scalars(select(QuestionState).where(
         QuestionState.session_id == session.id, QuestionState.offer_id == oid)).all()

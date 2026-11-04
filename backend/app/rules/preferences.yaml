@@ -40,6 +40,6 @@ questionnaire_v2:
       kind: single
       prompt: 未来 3–5 年，在工作城市买房这事儿上日程吗？
       options:
-        - {value: consider, label: 考虑}
-        - {value: not_consider, label: 不考虑}
-        - {value: undecided, label: 还没决定}
+        - {value: consider, label: 考虑, description: 把月供压力计入经济回报——购房城市房价越高，这笔 Offer 的现金优势被打的折扣越大}
+        - {value: not_consider, label: 不考虑, description: 不把买房压力计入经济回报，评分只看收入与日常开销}
+        - {value: undecided, label: 还没决定, description: 暂不计入买房压力（与「不考虑」同口径），之后随时可以回来改}

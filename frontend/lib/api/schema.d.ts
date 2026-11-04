@@ -1390,6 +1390,11 @@ export interface components {
             value: string;
             /** Label */
             label: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
         };
         /** PreferenceQuestionResource */
         PreferenceQuestionResource: {
@@ -1676,6 +1681,8 @@ export interface components {
              */
             tradeoff: string;
             sensitivity?: components["schemas"]["SensitivityView"] | null;
+            /** Excluded Offers */
+            excluded_offers?: string[];
         };
         /** ResumeData */
         ResumeData: {

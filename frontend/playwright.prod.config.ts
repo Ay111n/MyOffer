@@ -10,7 +10,16 @@ import { defineConfig, devices } from "@playwright/test";
  * 前置：先 `npm run build` 产出 out/（Makefile e2e-prod 目标已包含）。
  */
 const STATIC_PORT = 4173;
-const BACKEND_PORT = Number(process.env.E2E_BACKEND_PORT ?? "8000");
+/** e2e 专用后端端口：与开发用的 8000 错开。reuseExistingServer 会复用端口上
+ *  已经在跑的服务——若复用的是手工启动的开发后端，下面注入的限流豁免不会
+ *  生效（env 只对 Playwright 自己拉起的进程有效），E2E 就会莫名撞上 429。 */
+const BACKEND_PORT = Number(process.env.E2E_BACKEND_PORT ?? "8010");
+
+/** E2E 限流豁免：后端按 client IP 限制匿名会话创建（默认 30 次/分），而每个
+ *  Playwright 用例都是全新 context → 每次首页加载都新建匿名身份，几十个用例
+ *  同走 127.0.0.1，一分钟内必然触发 429，页面报「创建会话失败：请求过于频繁」。
+ *  只放宽 E2E 自己的后端进程，生产阈值不动。 */
+const E2E_BACKEND_ENV = { RATE_LIMIT_SESSIONS_PER_MINUTE: "1000" };
 
 export default defineConfig({
   testDir: "./e2e",
@@ -40,6 +49,7 @@ export default defineConfig({
       url: `http://127.0.0.1:${BACKEND_PORT}/healthz`,
       reuseExistingServer: true,
       timeout: 120_000,
+      env: E2E_BACKEND_ENV,
     },
   ],
   projects: [

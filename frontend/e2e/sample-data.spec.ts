@@ -1,11 +1,13 @@
 import { expect, test } from "@playwright/test";
 
+import { fillExampleFactsViaApi } from "./helpers";
+
 test("三份示例完整且总分接近", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("button", { name: /Offer B.*0\/7/ })).toBeVisible();
   await page.getByRole("button", { name: "添加 Offer" }).click();
   await expect(page.getByRole("button", { name: /Offer C.*0\/7/ })).toBeVisible();
-  await page.getByRole("button", { name: "填入示例数据" }).click();
+  await fillExampleFactsViaApi(page);
   for (const label of ["A", "B", "C"]) {
     await expect(page.getByRole("button", { name: new RegExp(`Offer ${label}.*7/7`) })).toBeVisible();
   }
@@ -47,17 +49,4 @@ test("三份示例完整且总分接近", async ({ page }) => {
   const spread = Math.max(...offers.map((offer) => offer.overall_score)) - Math.min(...offers.map((offer) => offer.overall_score));
   expect(spread).toBeGreaterThan(1.5);
   expect(spread).toBeLessThan(4);
-});
-
-test("两份示例按当前 Offer 数量填充且不覆盖用户修改", async ({ page }) => {
-  await page.goto("/");
-  await expect(page.getByRole("button", { name: /Offer B.*0\/7/ })).toBeVisible();
-  await page.getByRole("button", { name: "填入示例数据" }).click();
-  await expect(page.getByRole("button", { name: /Offer A.*7\/7/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Offer B.*7\/7/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Offer C/ })).toHaveCount(0);
-  await page.getByRole("spinbutton", { name: "税前月薪" }).fill("31000");
-  await page.getByRole("button", { name: "填入示例数据" }).click();
-  await expect(page.getByRole("spinbutton", { name: "税前月薪" })).toHaveValue("31000");
-  await expect(page.getByRole("button", { name: /Offer C/ })).toHaveCount(0);
 });
