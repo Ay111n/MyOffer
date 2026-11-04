@@ -45,13 +45,15 @@ _MAX_INT = 10**15
 # 事件为追加型数据且不随会话删除级联：不设保留窗口会让存储无界增长。
 # 超过保留期的事件在批量写入路径按时间窗节流清理（最多每 10 分钟一次）。
 _PRUNE_INTERVAL_SECONDS = 600.0
-_last_prune_monotonic = 0.0
+# 单调时钟的参考点没有固定含义，0 也可能是有效读数；None 表示尚未清理。
+_last_prune_monotonic: float | None = None
 
 
 def _prune_expired(db: Session) -> None:
     global _last_prune_monotonic
     now = time.monotonic()
-    if now - _last_prune_monotonic < _PRUNE_INTERVAL_SECONDS:
+    if (_last_prune_monotonic is not None
+            and now - _last_prune_monotonic < _PRUNE_INTERVAL_SECONDS):
         return
     _last_prune_monotonic = now
     # created_at 由数据库 CURRENT_TIMESTAMP 生成（naive UTC），cutoff 同口径

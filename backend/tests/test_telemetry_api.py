@@ -6,6 +6,8 @@
 """
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
@@ -120,13 +122,14 @@ def test_result_status_accepts_frontend_payload(client, sid):
     assert r.json()["data"]["accepted"] == 1
 
 
-def test_retention_prunes_expired_events(client, sid):
+@pytest.mark.parametrize("clock_value", [0.0, 30.0, 6000.0])
+def test_retention_prunes_expired_events(client, sid, monkeypatch, clock_value):
     """事件为追加型数据且不随会话级联删除：超过保留期（24 小时）的事件在
     下一次批量写入时被节流清理，避免存储无界增长。"""
-    from datetime import UTC, datetime, timedelta
-
     import app.services.telemetry_service as ts
 
+    monkeypatch.setattr(ts, "time", SimpleNamespace(monotonic=lambda: clock_value))
+    monkeypatch.setattr(ts, "_last_prune_monotonic", None)
     with get_session_factory()() as db:
         db.add(TelemetryEvent(
             session_id=UUID(sid), event_type="step_enter", payload={"step": "old"},
@@ -136,7 +139,6 @@ def test_retention_prunes_expired_events(client, sid):
             session_id=UUID(sid), event_type="step_enter", payload={"step": "fresh"},
         ))
         db.commit()
-    ts._last_prune_monotonic = 0.0  # 绕过时间窗节流，测试内强制执行
     r = _post(client, sid, [{"event_type": "step_enter", "payload": {"step": "new"}}])
     assert r.status_code == 200, r.text
     with get_session_factory()() as db:
@@ -145,3 +147,33 @@ def test_retention_prunes_expired_events(client, sid):
         ).all()]
     assert "old" not in steps
     assert "fresh" in steps and "new" in steps
+
+
+def test_retention_throttles_after_zero_clock_and_prunes_at_interval(client, sid, monkeypatch):
+    """首次清理时钟恰为 0，后续仍须节流；满 600 秒后才清理下一批过期事件。"""
+    import app.services.telemetry_service as ts
+
+    clock = SimpleNamespace(value=0.0)
+    monkeypatch.setattr(ts, "time", SimpleNamespace(monotonic=lambda: clock.value))
+    monkeypatch.setattr(ts, "_last_prune_monotonic", None)
+    with get_session_factory()() as db:
+        for step in ("first", "deferred"):
+            db.add(TelemetryEvent(
+                session_id=UUID(sid), event_type="step_enter", payload={"step": step},
+                created_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(days=45),
+            ))
+            db.commit()
+            ts._prune_expired(db)
+            db.commit()
+            remaining = db.scalars(
+                select(TelemetryEvent).where(TelemetryEvent.session_id == UUID(sid))
+            ).all()
+            assert [row.payload["step"] for row in remaining] == (
+                [] if step == "first" else ["deferred"])
+            clock.value = 599.0
+        clock.value = 600.0
+        ts._prune_expired(db)
+        db.commit()
+        assert db.scalars(
+            select(TelemetryEvent).where(TelemetryEvent.session_id == UUID(sid))
+        ).all() == []
